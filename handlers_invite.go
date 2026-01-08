@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/mail"
 	"strings"
 
@@ -57,8 +58,27 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 		return
 	}
 
-	// TODO: Send email with invite code
-	// For now, just return the code to the user
+	// Get inviter's display name for the email
+	inviterName := "Someone"
+	inviter, _ := h.db.GetUserByID(ctx, s.userID)
+	if inviter != nil && inviter.Public != nil {
+		// Try to extract display name from public data
+		var pub map[string]any
+		if json.Unmarshal(inviter.Public, &pub) == nil {
+			if fn, ok := pub["fn"].(string); ok && fn != "" {
+				inviterName = fn
+			}
+		}
+	}
+
+	// Send invite email
+	toName := ""
+	if name != nil {
+		toName = *name
+	}
+	if h.email != nil && h.email.IsEnabled() {
+		go h.email.SendInvite(invite.Email, toName, invite.Code, inviterName)
+	}
 
 	s.Send(CtrlSuccess(msg.ID, CodeCreated, map[string]any{
 		"id":        invite.ID.String(),

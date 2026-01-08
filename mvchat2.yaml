@@ -26,8 +26,17 @@ redis:
   enabled: ${REDIS_ENABLED:false}
   addr: ${REDIS_ADDR:localhost:6379}
   password: ${REDIS_PASSWORD:}
-  db: 0
+  db: ${REDIS_DB:0}
   node_id: ${NODE_ID:node1}
+
+email:
+  enabled: ${EMAIL_ENABLED:false}
+  host: ${EMAIL_HOST:smtp.gmail.com}
+  port: ${EMAIL_PORT:587}
+  username: ${EMAIL_USERNAME:}
+  password: ${EMAIL_PASSWORD:}
+  from: ${EMAIL_FROM:noreply@mvchat.app}
+  from_name: ${EMAIL_FROM_NAME:mvChat}
 
 auth:
   api_key_salt: ${API_KEY_SALT:T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=}

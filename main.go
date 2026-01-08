@@ -14,6 +14,7 @@ import (
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/config"
 	"github.com/scalecode-solutions/mvchat2/crypto"
+	"github.com/scalecode-solutions/mvchat2/email"
 	"github.com/scalecode-solutions/mvchat2/media"
 	"github.com/scalecode-solutions/mvchat2/redis"
 	"github.com/scalecode-solutions/mvchat2/store"
@@ -135,8 +136,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize email service
+	emailService := email.New(email.Config{
+		Enabled:  cfg.Email.Enabled,
+		Host:     cfg.Email.Host,
+		Port:     cfg.Email.Port,
+		Username: cfg.Email.Username,
+		Password: cfg.Email.Password,
+		From:     cfg.Email.From,
+		FromName: cfg.Email.FromName,
+	})
+
 	// Initialize handlers
-	handlers := NewHandlers(db, authService, hub, encryptor)
+	handlers := NewHandlers(db, authService, hub, encryptor, emailService)
 
 	// Initialize media processor
 	mediaProcessor := media.NewProcessor(media.Config{

@@ -8,6 +8,7 @@ import (
 
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/crypto"
+	"github.com/scalecode-solutions/mvchat2/email"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
@@ -17,15 +18,17 @@ type Handlers struct {
 	auth      *auth.Auth
 	hub       *Hub
 	encryptor *crypto.Encryptor
+	email     *email.Service
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor) *Handlers {
+func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service) *Handlers {
 	return &Handlers{
 		db:        db,
 		auth:      a,
 		hub:       hub,
 		encryptor: enc,
+		email:     emailSvc,
 	}
 }
 

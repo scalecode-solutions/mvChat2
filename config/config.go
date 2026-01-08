@@ -14,6 +14,7 @@ type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
+	Email    EmailConfig    `yaml:"email"`
 	Auth     AuthConfig     `yaml:"auth"`
 	Media    MediaConfig    `yaml:"media"`
 	Limits   LimitsConfig   `yaml:"limits"`
@@ -103,6 +104,17 @@ type RedisConfig struct {
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
 	NodeID   string `yaml:"node_id"`
+}
+
+// EmailConfig contains email/SMTP settings.
+type EmailConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`
+	FromName string `yaml:"from_name"`
 }
 
 // Load reads and parses a YAML config file.
