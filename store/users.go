@@ -124,6 +124,32 @@ func (db *DB) UsernameExists(ctx context.Context, username string) (bool, error)
 	return exists, err
 }
 
+// UpdatePassword updates the user's password (basic auth secret).
+func (db *DB) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE auth SET secret = $1
+		WHERE user_id = $2 AND scheme = 'basic'
+	`, hashedPassword, userID)
+	return err
+}
+
+// GetAuthByUserID retrieves the basic auth record for a user.
+func (db *DB) GetAuthByUserID(ctx context.Context, userID uuid.UUID) (*AuthRecord, error) {
+	var auth AuthRecord
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, user_id, scheme, secret, uname, expires_at, created_at
+		FROM auth WHERE user_id = $1 AND scheme = 'basic'
+	`, userID).Scan(&auth.ID, &auth.UserID, &auth.Scheme, &auth.Secret, &auth.Uname, &auth.ExpiresAt, &auth.CreatedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &auth, nil
+}
+
 // SearchUsers searches for users by display name (from public.fn field).
 func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User, error) {
 	if limit <= 0 || limit > 50 {

@@ -305,7 +305,58 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 	}
 
-	// TODO: Handle password change if acc.Secret is provided
+	// Handle password change if secret is provided
+	if acc.Secret != "" {
+		// Decode secret (oldPassword:newPassword)
+		decoded, err := base64.StdEncoding.DecodeString(acc.Secret)
+		if err != nil {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret encoding"))
+			return
+		}
+
+		parts := strings.SplitN(string(decoded), ":", 2)
+		if len(parts) != 2 {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret format (expected oldPassword:newPassword)"))
+			return
+		}
+		oldPassword, newPassword := parts[0], parts[1]
+
+		// Validate new password
+		if err := h.auth.ValidatePassword(newPassword); err != nil {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "new password too short"))
+			return
+		}
+
+		// Get current auth record
+		authRecord, err := h.db.GetAuthByUserID(ctx, s.userID)
+		if err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+			return
+		}
+		if authRecord == nil {
+			s.Send(CtrlError(msg.ID, CodeNotFound, "auth record not found"))
+			return
+		}
+
+		// Verify old password
+		if !h.auth.VerifyPassword(oldPassword, authRecord.Secret) {
+			s.Send(CtrlError(msg.ID, CodeForbidden, "incorrect current password"))
+			return
+		}
+
+		// Hash new password
+		hashedPassword, err := h.auth.HashPassword(newPassword)
+		if err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to hash password"))
+			return
+		}
+
+		// Update password
+		if err := h.db.UpdatePassword(ctx, s.userID, hashedPassword); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update password"))
+			return
+		}
+	}
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 }
