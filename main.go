@@ -177,14 +177,18 @@ func main() {
 	srv.SetupRoutes(mux)
 	fileHandlers.SetupRoutes(mux)
 
-	// Start HTTP server
+	// Start HTTP server with timeouts
 	httpServer := &http.Server{
-		Addr:    cfg.Server.Listen,
-		Handler: mux,
+		Addr:         cfg.Server.Listen,
+		Handler:      mux,
+		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	}
 
 	go func() {
-		fmt.Printf("Listening on %s\n", cfg.Server.Listen)
+		fmt.Printf("Listening on %s (timeouts: read=%ds, write=%ds, idle=%ds)\n",
+			cfg.Server.Listen, cfg.Server.ReadTimeout, cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
 		}
@@ -196,11 +200,27 @@ func main() {
 	<-quit
 
 	fmt.Println("Shutting down...")
+
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(),
+		time.Duration(cfg.Server.ShutdownTimeout)*time.Second)
+	defer shutdownCancel()
+
+	// Cancel pub/sub first
 	if pubsubCancel != nil {
 		pubsubCancel()
 	}
+
+	// Shutdown hub (closes WebSocket connections)
 	hub.Shutdown()
-	httpServer.Close()
+
+	// Gracefully shutdown HTTP server
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		fmt.Fprintf(os.Stderr, "HTTP server shutdown error: %v\n", err)
+		httpServer.Close() // Force close if graceful shutdown fails
+	}
+
+	fmt.Println("Server stopped")
 }
 
 // generateSecureKey generates a cryptographically secure random key.

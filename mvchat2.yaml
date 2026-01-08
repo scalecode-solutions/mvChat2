@@ -7,6 +7,11 @@ server:
   static_path: "./static"
   use_x_forwarded_for: true
   default_country_code: "US"
+  # HTTP server timeouts (seconds) - protects against slowloris attacks
+  read_timeout: 15
+  write_timeout: 15
+  idle_timeout: 60
+  shutdown_timeout: 30
 
 database:
   host: ${DB_HOST:localhost}

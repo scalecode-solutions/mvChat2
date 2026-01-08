@@ -29,6 +29,11 @@ type ServerConfig struct {
 	StaticPath         string `yaml:"static_path"`
 	UseXForwardedFor   bool   `yaml:"use_x_forwarded_for"`
 	DefaultCountryCode string `yaml:"default_country_code"`
+	// HTTP server timeouts (in seconds)
+	ReadTimeout     int `yaml:"read_timeout"`
+	WriteTimeout    int `yaml:"write_timeout"`
+	IdleTimeout     int `yaml:"idle_timeout"`
+	ShutdownTimeout int `yaml:"shutdown_timeout"`
 }
 
 // DatabaseConfig contains PostgreSQL connection settings.
@@ -172,6 +177,18 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Server.DefaultCountryCode == "" {
 		c.Server.DefaultCountryCode = "US"
+	}
+	if c.Server.ReadTimeout == 0 {
+		c.Server.ReadTimeout = 15 // 15 seconds
+	}
+	if c.Server.WriteTimeout == 0 {
+		c.Server.WriteTimeout = 15 // 15 seconds
+	}
+	if c.Server.IdleTimeout == 0 {
+		c.Server.IdleTimeout = 60 // 60 seconds
+	}
+	if c.Server.ShutdownTimeout == 0 {
+		c.Server.ShutdownTimeout = 30 // 30 seconds for graceful shutdown
 	}
 
 	// Database defaults
