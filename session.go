@@ -117,7 +117,17 @@ func (s *Session) Ver() string {
 }
 
 // Send queues a message to be sent to the client.
+// Safe to call from multiple goroutines.
 func (s *Session) Send(msg *ServerMessage) {
+	// Use a simple recover to handle the race condition where Close()
+	// may close the channel between our check and the send operation.
+	// This is more efficient than using a mutex for every send.
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel was closed, session is closing - ignore
+		}
+	}()
+
 	if atomic.LoadInt32(&s.closing) == 1 {
 		return
 	}
@@ -125,11 +135,12 @@ func (s *Session) Send(msg *ServerMessage) {
 	case s.send <- msg:
 	default:
 		// Buffer full, close the session
-		s.Close()
+		go s.Close() // Close in goroutine to avoid deadlock
 	}
 }
 
 // Close closes the session.
+// Safe to call multiple times - only first call takes effect.
 func (s *Session) Close() {
 	s.once.Do(func() {
 		atomic.StoreInt32(&s.closing, 1)
