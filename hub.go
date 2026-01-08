@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/scalecode-solutions/mvchat2/redis"
 )
 
 // Hub maintains active sessions and routes messages between them.
@@ -24,6 +27,9 @@ type Hub struct {
 
 	// Presence manager (set after initialization)
 	presence *PresenceManager
+
+	// Redis client for pub/sub (optional, nil if not enabled)
+	redis *redis.Client
 }
 
 // NewHub creates a new Hub instance.
@@ -63,6 +69,41 @@ func (h *Hub) Shutdown() {
 // SetPresence sets the presence manager.
 func (h *Hub) SetPresence(p *PresenceManager) {
 	h.presence = p
+}
+
+// SetRedis sets the Redis client for pub/sub.
+func (h *Hub) SetRedis(r *redis.Client) {
+	h.redis = r
+}
+
+// PubSubPayload wraps a server message with routing info for pub/sub.
+type PubSubPayload struct {
+	UserID  string         `json:"userId"`
+	Message *ServerMessage `json:"message"`
+}
+
+// HandlePubSubMessage handles messages received from Redis pub/sub.
+func (h *Hub) HandlePubSubMessage(msg *redis.Message) {
+	var payload PubSubPayload
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return
+	}
+
+	userID, err := uuid.Parse(payload.UserID)
+	if err != nil {
+		return
+	}
+
+	// Deliver to local sessions for this user
+	h.SendToUser(userID, payload.Message)
+}
+
+// PublishToUser publishes a message to a user via Redis (for cross-node delivery).
+func (h *Hub) PublishToUser(ctx context.Context, userID uuid.UUID, msg *ServerMessage) error {
+	if h.redis == nil {
+		return nil
+	}
+	return h.redis.Publish(ctx, "user:"+userID.String(), "data", msg)
 }
 
 // Register adds a session to the hub.

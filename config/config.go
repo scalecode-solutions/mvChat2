@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
+	Redis    RedisConfig    `yaml:"redis"`
 	Auth     AuthConfig     `yaml:"auth"`
 	Media    MediaConfig    `yaml:"media"`
 	Limits   LimitsConfig   `yaml:"limits"`
@@ -93,6 +94,15 @@ type LimitsConfig struct {
 // DebugConfig contains debugging endpoints configuration.
 type DebugConfig struct {
 	ExpvarPath string `yaml:"expvar_path"`
+}
+
+// RedisConfig contains Redis connection settings.
+type RedisConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
+	NodeID   string `yaml:"node_id"`
 }
 
 // Load reads and parses a YAML config file.

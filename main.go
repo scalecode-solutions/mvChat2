@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/scalecode-solutions/mvchat2/config"
 	"github.com/scalecode-solutions/mvchat2/crypto"
 	"github.com/scalecode-solutions/mvchat2/media"
+	"github.com/scalecode-solutions/mvchat2/redis"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
@@ -77,9 +79,38 @@ func main() {
 		MinPasswordLength: cfg.Auth.Basic.MinPasswordLength,
 	})
 
+	// Initialize Redis (optional)
+	var redisClient *redis.Client
+	if cfg.Redis.Enabled {
+		var err error
+		redisClient, err = redis.New(redis.Config{
+			Addr:     cfg.Redis.Addr,
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.DB,
+			NodeID:   cfg.Redis.NodeID,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to connect to Redis: %v\n", err)
+			os.Exit(1)
+		}
+		defer redisClient.Close()
+		fmt.Printf("Connected to Redis (node: %s)\n", cfg.Redis.NodeID)
+	}
+
 	// Initialize hub
 	hub := NewHub()
+	hub.SetRedis(redisClient)
 	go hub.Run()
+
+	// Start Redis pub/sub listener if enabled
+	var pubsubCancel context.CancelFunc
+	if redisClient != nil {
+		var pubsubCtx context.Context
+		pubsubCtx, pubsubCancel = context.WithCancel(context.Background())
+		pubsub := redisClient.NewPubSub(hub.HandlePubSubMessage)
+		pubsub.SubscribeToNode(pubsubCtx)
+		go pubsub.Listen(pubsubCtx)
+	}
 
 	// Initialize presence manager
 	presence := NewPresenceManager(hub, db)
@@ -133,6 +164,9 @@ func main() {
 	<-quit
 
 	fmt.Println("Shutting down...")
+	if pubsubCancel != nil {
+		pubsubCancel()
+	}
 	hub.Shutdown()
 	httpServer.Close()
 }

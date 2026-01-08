@@ -22,6 +22,13 @@ database:
   uid_key: ${UID_KEY:la6YsO+bNX/+XIkOqc5Svw==}
   encryption_key: ${ENCRYPTION_KEY:k8Jz9mN2pQ4rT6vX8yB1dF3hK5nP7sU0wA2cE4gI6jL=}
 
+redis:
+  enabled: ${REDIS_ENABLED:false}
+  addr: ${REDIS_ADDR:localhost:6379}
+  password: ${REDIS_PASSWORD:}
+  db: 0
+  node_id: ${NODE_ID:node1}
+
 auth:
   api_key_salt: ${API_KEY_SALT:T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=}
   
