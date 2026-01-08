@@ -168,6 +168,7 @@ mvChat2 uses invite codes to connect users. This document describes the complete
 - [ ] Message search (full-text)
 - [ ] Full room permissions (admin/kick/ban)
 - [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
+- [ ] Webhooks (optional - for enterprise/professional integrations)
 
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface
