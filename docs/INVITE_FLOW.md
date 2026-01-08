@@ -159,8 +159,33 @@ mvChat2 uses invite codes to connect users. This document describes the complete
 
 ## Future Enhancements
 
+### Backend (mvChat2)
 - [ ] Password change endpoint
 - [ ] `must_change_password` flag for temp passwords
 - [ ] Store email on user account (currently only in invite)
 - [ ] Email verification flow
 - [ ] SMS invite codes (alternative to email)
+- [ ] Message search (full-text)
+- [ ] Full room permissions (admin/kick/ban)
+- [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
+
+### Web Client (chat.mvchat.app)
+- [ ] Web version of Clingy chat interface
+- [ ] Invite code redemption page
+- [ ] Sign in / sign up flow
+- [ ] Password change UI
+- [ ] DM and room messaging
+- [ ] File upload/download
+- [ ] Contacts management
+- [ ] Profile settings
+
+## Design Decisions
+
+### No Push Notifications
+Push notifications are intentionally NOT implemented. This is a security feature for DV survivors - the app disguises as a pregnancy tracker (Clingy), and push notifications would reveal the hidden chat functionality. Users must open the app to check messages.
+
+### No CallKit Integration
+Future audio calls will use WebRTC WITHOUT iOS CallKit. This prevents calls from appearing in the phone's call log, which would expose the hidden chat. Calls only work when the app is open in chat mode.
+
+### Private Rooms Only
+All rooms are private/invite-only by default. No public room discovery - doesn't fit the DV survivor use case.
