@@ -169,6 +169,9 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Full room permissions (admin/kick/ban)
 - [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
 - [ ] Webhooks (optional - for enterprise/professional integrations)
+- [ ] Trusted account badges (`verified` flag + `credentials` JSONB for professionals)
+- [ ] Account suspension (`suspended_at`, `suspended_reason`)
+- [ ] Admin endpoints for user management
 
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface
