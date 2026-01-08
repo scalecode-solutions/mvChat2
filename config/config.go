@@ -337,5 +337,22 @@ func (c *Config) validate() error {
 		return fmt.Errorf("database.encryption_key must be at least 32 characters (for AES-256)")
 	}
 
+	// Validate numeric limits
+	if c.Auth.Basic.MinLoginLength <= 0 {
+		return fmt.Errorf("auth.basic.min_login_length must be > 0")
+	}
+	if c.Auth.Basic.MinPasswordLength <= 0 {
+		return fmt.Errorf("auth.basic.min_password_length must be > 0")
+	}
+	if c.Limits.MaxMessageSize <= 0 {
+		return fmt.Errorf("limits.max_message_size must be > 0")
+	}
+	if c.Limits.MaxSubscriberCount <= 0 {
+		return fmt.Errorf("limits.max_subscriber_count must be > 0")
+	}
+	if c.Media.MaxSize <= 0 {
+		return fmt.Errorf("media.max_size must be > 0")
+	}
+
 	return nil
 }

@@ -195,7 +195,7 @@ func (fh *FileHandlers) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fileWithMeta.Status != "ready" {
-		http.Error(w, "file not ready", http.StatusAccepted)
+		http.Error(w, "file not ready", http.StatusConflict)
 		return
 	}
 
