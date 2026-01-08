@@ -1,0 +1,37 @@
+{
+  "name": "@mvchat/react-native-sdk",
+  "version": "0.1.0",
+  "description": "React Native SDK for mvChat2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-native": ">=0.70.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "mvchat",
+    "chat",
+    "websocket",
+    "react-native",
+    "sdk"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scalecode-solutions/mvChat2.git",
+    "directory": "sdk"
+  }
+}
