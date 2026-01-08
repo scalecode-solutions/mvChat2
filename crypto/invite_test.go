@@ -26,10 +26,10 @@ func TestInviteTokenGenerator(t *testing.T) {
 			t.Fatalf("Generate failed: %v", err)
 		}
 
-		// Token should be base62 (alphanumeric only)
+		// Token should be URL-safe base64 (alphanumeric plus - and _)
 		for _, c := range token {
-			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-				t.Errorf("Token contains non-base62 character %q: %s", c, token)
+			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '-' || c == '_') {
+				t.Errorf("Token contains non-base64url character %q: %s", c, token)
 				break
 			}
 		}
@@ -198,35 +198,50 @@ func TestInvalidTokenFormats(t *testing.T) {
 	}
 }
 
-func TestBase62Encoding(t *testing.T) {
-	// Test round-trip encoding
-	testCases := [][]byte{
-		{0, 0, 0, 1},
-		{255, 255, 255, 255},
-		{1, 2, 3, 4, 5, 6, 7, 8},
-		make([]byte, 32),
+func TestShortCode(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
 	}
 
-	for i, data := range testCases {
-		encoded := encodeBase62(data)
-		decoded, err := decodeBase62(encoded)
-		if err != nil {
-			t.Errorf("Case %d: decode failed: %v", i, err)
-			continue
-		}
+	gen, err := NewInviteTokenGenerator(key, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("NewInviteTokenGenerator failed: %v", err)
+	}
 
-		// Compare - note that leading zeros may be lost
-		if len(decoded) != len(data) {
-			// Check if difference is just leading zeros
-			minLen := len(decoded)
-			if len(data) < minLen {
-				minLen = len(data)
-			}
-			for j := 0; j < minLen; j++ {
-				if decoded[len(decoded)-1-j] != data[len(data)-1-j] {
-					t.Errorf("Case %d: mismatch at byte %d", i, j)
-				}
-			}
+	token, err := gen.Generate("alice@example.com", "bob@example.com")
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	// Generate short code
+	code := gen.ShortCode(token)
+
+	// Should be exactly 10 characters
+	if len(code) != 10 {
+		t.Errorf("ShortCode length = %d, want 10", len(code))
+	}
+
+	// Should be URL-safe base64 characters
+	for _, c := range code {
+		if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '-' || c == '_') {
+			t.Errorf("ShortCode contains invalid character %q: %s", c, code)
+			break
 		}
 	}
+
+	// Same token should produce same short code (deterministic)
+	code2 := gen.ShortCode(token)
+	if code != code2 {
+		t.Errorf("ShortCode not deterministic: %s != %s", code, code2)
+	}
+
+	// Different tokens should produce different short codes
+	token2, _ := gen.Generate("alice@example.com", "bob@example.com")
+	code3 := gen.ShortCode(token2)
+	if code == code3 {
+		t.Errorf("Different tokens produced same short code: %s", code)
+	}
+
+	t.Logf("Sample short code: %s", code)
 }

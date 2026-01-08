@@ -4,10 +4,9 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"math/big"
-	"strings"
 	"time"
 )
 
@@ -16,9 +15,6 @@ var (
 	ErrInviteTokenExpired = errors.New("invite token expired")
 	ErrInviteKeyTooShort  = errors.New("invite key must be at least 32 bytes")
 )
-
-// base62 alphabet for compact encoding
-const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 // InviteTokenData contains the decoded invite token payload.
 type InviteTokenData struct {
@@ -44,7 +40,7 @@ func NewInviteTokenGenerator(key []byte, ttl time.Duration) (*InviteTokenGenerat
 }
 
 // Generate creates a compact cryptographic invite token.
-// Format: base62(entropy || timestamp || inviterLen || inviter || invitee || hmac_truncated)
+// Format: base64url(entropy || timestamp || inviterLen || inviter || invitee || hmac_truncated)
 // - entropy: 8 random bytes (64 bits - still very secure for invite codes)
 // - timestamp: 4 bytes (unix seconds, good until 2106)
 // - inviterLen: 1 byte (max 255 chars for username)
@@ -85,15 +81,15 @@ func (g *InviteTokenGenerator) Generate(inviterEmail, inviteeEmail string) (stri
 	// Final token: payload || signature
 	token := append(payload, sig...)
 
-	// Encode as base62 for compact representation
-	return encodeBase62(token), nil
+	// Encode as URL-safe base64 (no padding for cleaner URLs)
+	return base64.RawURLEncoding.EncodeToString(token), nil
 }
 
 // Verify decodes and verifies an invite token.
 // Returns the decoded data if valid, or an error if invalid or expired.
 func (g *InviteTokenGenerator) Verify(token string) (*InviteTokenData, error) {
-	// Decode base62
-	data, err := decodeBase62(token)
+	// Decode URL-safe base64
+	data, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
 		return nil, ErrInvalidInviteToken
 	}
@@ -160,84 +156,22 @@ func (g *InviteTokenGenerator) VerifyForRecipient(token, recipientEmail string) 
 	return data, nil
 }
 
-// encodeBase62 encodes bytes to base62 string.
-func encodeBase62(data []byte) string {
-	if len(data) == 0 {
-		return ""
+// ShortCode generates a short 10-character alphanumeric code from a token.
+// This is a deterministic hash - the same token always produces the same short code.
+// The short code is used as a user-friendly lookup key; the full token is stored in DB.
+func (g *InviteTokenGenerator) ShortCode(token string) string {
+	// Hash the token with the key to create a deterministic short code
+	mac := hmac.New(sha256.New, g.key)
+	mac.Write([]byte(token))
+	hash := mac.Sum(nil)
+
+	// Take first 6 bytes and encode as base64url, then trim to 10 chars
+	// 6 bytes = 8 base64 chars, but we want 10 for more entropy
+	// Use first 8 bytes (gives us 11 base64 chars, take first 10)
+	encoded := base64.RawURLEncoding.EncodeToString(hash[:8])
+	if len(encoded) > 10 {
+		encoded = encoded[:10]
 	}
 
-	// Convert bytes to big integer
-	num := new(big.Int).SetBytes(data)
-	base := big.NewInt(62)
-	zero := big.NewInt(0)
-	mod := new(big.Int)
-
-	var result strings.Builder
-	for num.Cmp(zero) > 0 {
-		num.DivMod(num, base, mod)
-		result.WriteByte(base62Alphabet[mod.Int64()])
-	}
-
-	// Handle leading zeros in input
-	for _, b := range data {
-		if b != 0 {
-			break
-		}
-		result.WriteByte('0')
-	}
-
-	// Reverse the string
-	s := result.String()
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-
-	return string(runes)
-}
-
-// decodeBase62 decodes a base62 string to bytes.
-func decodeBase62(s string) ([]byte, error) {
-	if len(s) == 0 {
-		return nil, errors.New("empty string")
-	}
-
-	// Build index map
-	indexMap := make(map[rune]int64)
-	for i, c := range base62Alphabet {
-		indexMap[c] = int64(i)
-	}
-
-	// Convert base62 to big integer
-	num := big.NewInt(0)
-	base := big.NewInt(62)
-
-	for _, c := range s {
-		idx, ok := indexMap[c]
-		if !ok {
-			return nil, errors.New("invalid character")
-		}
-		num.Mul(num, base)
-		num.Add(num, big.NewInt(idx))
-	}
-
-	// Convert to bytes
-	result := num.Bytes()
-
-	// Handle leading zeros
-	leadingZeros := 0
-	for _, c := range s {
-		if c != '0' {
-			break
-		}
-		leadingZeros++
-	}
-
-	if leadingZeros > 0 {
-		padded := make([]byte, leadingZeros+len(result))
-		copy(padded[leadingZeros:], result)
-		return padded, nil
-	}
-
-	return result, nil
+	return encoded
 }

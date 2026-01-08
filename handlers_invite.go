@@ -62,19 +62,22 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 		name = &n
 	}
 
-	// Create invite record in database
-	invite, err := h.db.CreateInviteCode(ctx, s.userID, inviteeEmail, name)
-	if err != nil {
-		log.Printf("invite: failed to create invite: %v", err)
-		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create invite"))
-		return
-	}
-
 	// Generate cryptographic token (inviter username + invitee email)
 	token, err := h.inviteTokens.Generate(inviterUsername, inviteeEmail)
 	if err != nil {
 		log.Printf("invite: failed to generate token: %v", err)
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to generate invite code"))
+		return
+	}
+
+	// Generate short code from the token
+	shortCode := h.inviteTokens.ShortCode(token)
+
+	// Create invite record in database with both code and token
+	invite, err := h.db.CreateInviteCode(ctx, s.userID, shortCode, token, inviteeEmail, name)
+	if err != nil {
+		log.Printf("invite: failed to create invite: %v", err)
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create invite"))
 		return
 	}
 
@@ -90,14 +93,14 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 		}
 	}
 
-	// Send invite email
+	// Send invite email with the short code (user-friendly)
 	toName := ""
 	if name != nil {
 		toName = *name
 	}
 	if h.email != nil && h.email.IsEnabled() {
 		go func() {
-			if err := h.email.SendInvite(inviteeEmail, toName, token, inviterName); err != nil {
+			if err := h.email.SendInvite(inviteeEmail, toName, shortCode, inviterName); err != nil {
 				log.Printf("invite: failed to send email to %s: %v", inviteeEmail, err)
 			} else {
 				log.Printf("invite: email sent to %s", inviteeEmail)
@@ -107,7 +110,7 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 
 	s.Send(CtrlSuccess(msg.ID, CodeCreated, map[string]any{
 		"id":        invite.ID.String(),
-		"code":      token,
+		"code":      shortCode,
 		"email":     invite.Email,
 		"name":      invite.InviteeName,
 		"expiresAt": invite.ExpiresAt,
@@ -121,9 +124,6 @@ func (h *Handlers) handleListInvites(ctx context.Context, s *Session, msg *Clien
 		return
 	}
 
-	// Get inviter's username for generating tokens
-	inviterUsername, _ := h.db.GetUserUsername(ctx, s.userID)
-
 	results := make([]map[string]any, 0, len(invites))
 	for _, inv := range invites {
 		item := map[string]any{
@@ -136,12 +136,9 @@ func (h *Handlers) handleListInvites(ctx context.Context, s *Session, msg *Clien
 		if inv.InviteeName != nil {
 			item["name"] = *inv.InviteeName
 		}
-		// Only generate tokens for pending invites
-		if inv.Status == "pending" && inviterUsername != "" {
-			token, err := h.inviteTokens.Generate(inviterUsername, inv.Email)
-			if err == nil {
-				item["code"] = token
-			}
+		// Return the short code for pending invites (stored in DB)
+		if inv.Status == "pending" && inv.Code != "" {
+			item["code"] = inv.Code
 		}
 		if inv.UsedAt != nil {
 			item["usedAt"] = inv.UsedAt
@@ -175,27 +172,27 @@ func (h *Handlers) handleRevokeInvite(ctx context.Context, s *Session, msg *Clie
 
 // handleRedeemInviteExisting allows an existing logged-in user to redeem an invite code.
 // This connects them with the inviter without creating a new account.
-func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, msg *ClientMessage, token string) {
-	// Verify the cryptographic token
-	tokenData, err := h.inviteTokens.Verify(token)
-	if err != nil {
-		if err == crypto.ErrInviteTokenExpired {
-			s.Send(CtrlError(msg.ID, CodeNotFound, "invite code expired"))
-		} else {
-			s.Send(CtrlError(msg.ID, CodeNotFound, "invalid invite code"))
-		}
-		return
-	}
-
-	// Look up the pending invite in the database
-	// Note: InviterEmail in the token is actually the inviter's username
-	invite, err := h.db.GetPendingInviteByUsernames(ctx, tokenData.InviterEmail, tokenData.InviteeEmail)
+// The code parameter is the short 10-char code that users share.
+func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, msg *ClientMessage, code string) {
+	// Look up the invite by short code
+	invite, err := h.db.GetInviteByCode(ctx, code)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to verify invite"))
 		return
 	}
 	if invite == nil {
 		s.Send(CtrlError(msg.ID, CodeNotFound, "invite not found or already used"))
+		return
+	}
+
+	// Verify the full cryptographic token stored in DB
+	_, err = h.inviteTokens.Verify(invite.Token)
+	if err != nil {
+		if err == crypto.ErrInviteTokenExpired {
+			s.Send(CtrlError(msg.ID, CodeNotFound, "invite code expired"))
+		} else {
+			s.Send(CtrlError(msg.ID, CodeNotFound, "invalid invite code"))
+		}
 		return
 	}
 
@@ -238,19 +235,19 @@ func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, m
 
 // RedeemInviteCode processes invite code redemption (signup via invite).
 // This is called during account creation when an invite code is provided.
+// The code parameter is the short 10-char code that users share.
 // It also auto-redeems any other pending invites to the same email.
-func (h *Handlers) RedeemInviteCode(ctx context.Context, token string, newUserID uuid.UUID, newUserEmail string) ([]uuid.UUID, error) {
-	// Verify the cryptographic token
-	tokenData, err := h.inviteTokens.Verify(token)
-	if err != nil {
-		return nil, nil // Invalid token, but not a hard error
+func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID uuid.UUID, newUserEmail string) ([]uuid.UUID, error) {
+	// Look up the invite by short code
+	invite, err := h.db.GetInviteByCode(ctx, code)
+	if err != nil || invite == nil {
+		return nil, nil // Not found, but not a hard error
 	}
 
-	// Look up the pending invite
-	// Note: InviterEmail in the token is actually the inviter's username
-	invite, err := h.db.GetPendingInviteByUsernames(ctx, tokenData.InviterEmail, tokenData.InviteeEmail)
-	if err != nil || invite == nil {
-		return nil, nil // Not found
+	// Verify the full cryptographic token stored in DB
+	_, err = h.inviteTokens.Verify(invite.Token)
+	if err != nil {
+		return nil, nil // Invalid or expired token
 	}
 
 	// Mark as used

@@ -107,7 +107,7 @@ func (db *DB) RemoveContact(ctx context.Context, userID, contactID uuid.UUID) er
 // GetPendingInvitesByEmail returns all pending invites for an email address.
 func (db *DB) GetPendingInvitesByEmail(ctx context.Context, email string) ([]InviteCode, error) {
 	rows, err := db.pool.Query(ctx, `
-		SELECT id, inviter_id, email, invitee_name, status, used_at, used_by, created_at, expires_at
+		SELECT id, inviter_id, code, token, email, invitee_name, status, used_at, used_by, created_at, expires_at
 		FROM invite_codes
 		WHERE email = $1 AND status = 'pending' AND expires_at > NOW()
 	`, email)
@@ -119,7 +119,7 @@ func (db *DB) GetPendingInvitesByEmail(ctx context.Context, email string) ([]Inv
 	var invites []InviteCode
 	for rows.Next() {
 		var inv InviteCode
-		if err := rows.Scan(&inv.ID, &inv.InviterID, &inv.Email, &inv.InviteeName,
+		if err := rows.Scan(&inv.ID, &inv.InviterID, &inv.Code, &inv.Token, &inv.Email, &inv.InviteeName,
 			&inv.Status, &inv.UsedAt, &inv.UsedBy, &inv.CreatedAt, &inv.ExpiresAt); err != nil {
 			return nil, err
 		}

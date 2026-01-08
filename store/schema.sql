@@ -247,7 +247,7 @@ CREATE TABLE schema_version (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES (5);
+INSERT INTO schema_version (version) VALUES (6);
 
 -- ============================================================================
 -- INVITE CODES
@@ -259,8 +259,13 @@ CREATE TABLE invite_codes (
     -- Who created the invite
     inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
+    -- Short 10-character alphanumeric code for user sharing
+    code VARCHAR(10) NOT NULL UNIQUE,
+
+    -- Full cryptographic token (for verification)
+    token TEXT NOT NULL,
+
     -- Recipient email (for sending the invite)
-    -- Cryptographic tokens are generated on-demand using inviter username + email
     email VARCHAR(255) NOT NULL,
 
     -- Optional: display name for the invitee
@@ -278,9 +283,8 @@ CREATE TABLE invite_codes (
 );
 
 CREATE INDEX idx_invite_codes_inviter ON invite_codes(inviter_id);
+CREATE INDEX idx_invite_codes_code ON invite_codes(code) WHERE status = 'pending';
 CREATE INDEX idx_invite_codes_email ON invite_codes(email);
--- Index for verifying tokens by inviter username and invitee email
-CREATE INDEX idx_invite_codes_pending ON invite_codes(inviter_id, email) WHERE status = 'pending';
 
 -- ============================================================================
 -- CONTACTS (User relationships from invites)
