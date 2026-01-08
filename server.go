@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -47,7 +48,7 @@ func (s *Server) SetupRoutes(mux *http.ServeMux) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Printf("WebSocket upgrade failed: %v\n", err)
+		log.Printf("server: WebSocket upgrade failed: %v", err)
 		return
 	}
 

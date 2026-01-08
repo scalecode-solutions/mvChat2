@@ -18,11 +18,18 @@ type Contact struct {
 }
 
 // AddContact adds a contact relationship (bidirectional).
+// Uses a transaction to ensure both directions are added atomically.
 func (db *DB) AddContact(ctx context.Context, userID, contactID uuid.UUID, source string, inviteID *uuid.UUID) error {
 	now := time.Now().UTC()
 
-	// Add both directions
-	_, err := db.pool.Exec(ctx, `
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Add both directions in a transaction
+	_, err = tx.Exec(ctx, `
 		INSERT INTO contacts (user_id, contact_id, source, invite_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id, contact_id) DO NOTHING
@@ -31,12 +38,16 @@ func (db *DB) AddContact(ctx context.Context, userID, contactID uuid.UUID, sourc
 		return err
 	}
 
-	_, err = db.pool.Exec(ctx, `
+	_, err = tx.Exec(ctx, `
 		INSERT INTO contacts (user_id, contact_id, source, invite_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id, contact_id) DO NOTHING
 	`, contactID, userID, source, inviteID, now)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetContacts returns all contacts for a user.

@@ -186,10 +186,18 @@ func TestValidate_AcceptsSecureConfig(t *testing.T) {
 		Auth: AuthConfig{
 			APIKeySalt: "uniqueSecureApiSaltGenerated1234",
 			Token:      TokenAuthConfig{Key: "uniqueSecureTokenKeyGenerated123"},
+			Basic:      BasicAuthConfig{MinLoginLength: 4, MinPasswordLength: 6},
 		},
 		Database: DatabaseConfig{
 			UIDKey:        "uniqueUIDKey1234",
 			EncryptionKey: "uniqueSecureEncryptionKey1234567",
+		},
+		Limits: LimitsConfig{
+			MaxMessageSize:     131072,
+			MaxSubscriberCount: 128,
+		},
+		Media: MediaConfig{
+			MaxSize: 8388608,
 		},
 	}
 	err := cfg.validate()
