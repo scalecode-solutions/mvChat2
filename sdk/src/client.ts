@@ -162,11 +162,20 @@ export class MVChat2Client {
           from: msg.data.from,
           ts: msg.data.ts,
           content: msg.data.content,
+          head: msg.data.head,
         });
       }
 
       if (msg.info) {
         this.handleInfo(msg.info);
+      }
+
+      if (msg.pres) {
+        this.emit('presence', {
+          user: msg.pres.user,
+          online: msg.pres.what === 'on',
+          lastSeen: msg.pres.lastSeen,
+        });
       }
 
       if (msg.meta) {
@@ -212,9 +221,6 @@ export class MVChat2Client {
         break;
       case 'react':
         this.emit('react', { conv: info.conv, seq: info.seq, from: info.from, emoji: info.emoji });
-        break;
-      case 'presence':
-        this.emit('presence', { user: info.user, online: info.online, lastSeen: info.lastSeen });
         break;
     }
   }
@@ -574,12 +580,13 @@ export class MVChat2Client {
     });
   }
 
-  async redeemInvite(code: string): Promise<{ inviter: string; conv: string }> {
+  async redeemInvite(code: string): Promise<{ inviter: string; inviterPublic: any; conv: string }> {
     const ctrl = await this.request({
       invite: { redeem: code },
     });
     return {
       inviter: ctrl.params?.inviter,
+      inviterPublic: ctrl.params?.inviterPublic,
       conv: ctrl.params?.conv,
     };
   }

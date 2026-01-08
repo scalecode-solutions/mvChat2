@@ -59,15 +59,20 @@ export type ConversationType = 'dm' | 'room';
 export interface Conversation {
   id: string;
   type: ConversationType;
-  createdAt: string;
-  updatedAt: string;
   lastSeq: number;
+  readSeq: number;
+  unread: number;
+  favorite?: boolean;
+  muted?: boolean;
   lastMsgAt?: string;
   public?: ConversationPublic;
-  readSeq: number;
-  recvSeq: number;
-  unread: number;
-  otherUser?: User;
+  // For DMs: the other user (backend returns as 'user')
+  user?: {
+    id: string;
+    public: UserPublic;
+    online: boolean;
+    lastSeen?: string;
+  };
 }
 
 export interface ConversationPublic {
@@ -92,13 +97,12 @@ export interface ReadReceipt {
 
 // Message types
 export interface Message {
-  conv: string;
   seq: number;
   from: string;
   ts: string;
-  content: Irido;
-  editedAt?: string;
-  reactions?: Record<string, string[]>;
+  content?: Irido;
+  head?: Record<string, any>;
+  deleted?: boolean;
 }
 
 export interface Irido {
@@ -171,13 +175,14 @@ export interface FileUploadResult {
   thumb?: string;
 }
 
-// Event types
+// Event types (for real-time events via WebSocket)
 export interface MessageEvent {
   conv: string;
   seq: number;
   from: string;
   ts: string;
   content: Irido;
+  head?: Record<string, any>;
 }
 
 export interface TypingEvent {
@@ -249,7 +254,8 @@ export interface ClientMessage {
 export interface MsgClientHi {
   ver: string;
   ua?: string;
-  sid?: string;
+  dev?: string;
+  lang?: string;
 }
 
 export interface MsgClientLogin {
@@ -281,7 +287,7 @@ export interface MsgClientDM {
 
 export interface MsgClientRoom {
   id?: string;
-  action?: 'create' | 'update' | 'delete';
+  action?: 'create' | 'join' | 'leave' | 'invite' | 'kick' | 'update';
   user?: string;
   desc?: { public?: any };
 }
@@ -350,7 +356,14 @@ export interface ServerMessage {
   ctrl?: MsgServerCtrl;
   data?: MsgServerData;
   info?: MsgServerInfo;
+  pres?: MsgServerPres;
   meta?: MsgServerMeta;
+}
+
+export interface MsgServerPres {
+  user: string;
+  what: 'on' | 'off';
+  lastSeen?: string;
 }
 
 export interface MsgServerCtrl {
@@ -375,6 +388,7 @@ export interface MsgServerInfo {
   what: string;
   seq?: number;
   content?: any;
+  emoji?: string;
   ts?: string;
 }
 

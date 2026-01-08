@@ -266,7 +266,7 @@ func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *
 				"online":   h.hub.IsOnline(c.OtherUser.ID),
 				"lastSeen": c.OtherUser.LastSeen,
 			}
-		} else if c.Type == "group" {
+		} else if c.Type == "room" {
 			item["public"] = c.Public
 		}
 		results = append(results, item)

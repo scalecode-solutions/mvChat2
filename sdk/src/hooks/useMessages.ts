@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MVChat2Client } from '../client';
-import { Message, SendMessageOptions } from '../types';
+import { Message, MessageEvent, SendMessageOptions } from '../types';
 
 export interface UseMessagesResult {
   messages: Message[];
@@ -50,17 +50,24 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
 
   // Listen for new messages
   useEffect(() => {
-    const handleMessage = (msg: Message) => {
-      if (msg.conv === conversationId) {
-        setMessages((prev) => [...prev, msg]);
+    const handleMessage = (event: MessageEvent) => {
+      if (event.conv === conversationId) {
+        const msg: Message = {
+          seq: event.seq,
+          from: event.from,
+          ts: event.ts,
+          content: event.content,
+          head: event.head,
+        };
+        setMessages((prev: Message[]) => [...prev, msg]);
       }
     };
 
     const handleEdit = (event: { conv: string; seq: number; content: any }) => {
       if (event.conv === conversationId) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.seq === event.seq ? { ...m, content: event.content, editedAt: new Date().toISOString() } : m
+        setMessages((prev: Message[]) =>
+          prev.map((m: Message) =>
+            m.seq === event.seq ? { ...m, content: event.content } : m
           )
         );
       }
@@ -68,13 +75,13 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
 
     const handleUnsend = (event: { conv: string; seq: number }) => {
       if (event.conv === conversationId) {
-        setMessages((prev) => prev.filter((m) => m.seq !== event.seq));
+        setMessages((prev: Message[]) => prev.filter((m: Message) => m.seq !== event.seq));
       }
     };
 
     const handleDelete = (event: { conv: string; seq: number }) => {
       if (event.conv === conversationId) {
-        setMessages((prev) => prev.filter((m) => m.seq !== event.seq));
+        setMessages((prev: Message[]) => prev.filter((m: Message) => m.seq !== event.seq));
       }
     };
 
@@ -101,7 +108,7 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
         limit: 50,
         before: oldestSeq,
       });
-      setMessages((prev) => [...olderMsgs.reverse(), ...prev]);
+      setMessages((prev: Message[]) => [...olderMsgs.reverse(), ...prev]);
       setHasMore(olderMsgs.length === 50);
     } catch (err) {
       setError(err as Error);

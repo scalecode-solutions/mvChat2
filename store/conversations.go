@@ -10,12 +10,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Conversation represents a conversation (DM or group).
+// Conversation represents a conversation (DM or room).
 type Conversation struct {
 	ID        uuid.UUID       `json:"id"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
-	Type      string          `json:"type"` // "dm" or "group"
+	Type      string          `json:"type"` // "dm" or "room"
 	OwnerID   *uuid.UUID      `json:"ownerId,omitempty"`
 	Public    json.RawMessage `json:"public,omitempty"`
 	LastSeq   int             `json:"lastSeq"`
@@ -169,7 +169,7 @@ func (db *DB) CreateRoom(ctx context.Context, ownerID uuid.UUID, public json.Raw
 		ID:        convID,
 		CreatedAt: now,
 		UpdatedAt: now,
-		Type:      "group",
+		Type:      "room",
 		OwnerID:   &ownerID,
 		Public:    public,
 		LastSeq:   0,

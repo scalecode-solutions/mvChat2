@@ -22,14 +22,14 @@ export function useTyping(client: MVChat2Client, conversationId: string): UseTyp
       }
 
       // Add user to typing list
-      setTypingUsers((prev) => {
+      setTypingUsers((prev: string[]) => {
         if (prev.includes(event.user)) return prev;
         return [...prev, event.user];
       });
 
       // Set timeout to remove user after 5 seconds
       const timeout = setTimeout(() => {
-        setTypingUsers((prev) => prev.filter((u) => u !== event.user));
+        setTypingUsers((prev: string[]) => prev.filter((u: string) => u !== event.user));
         typingTimeouts.current.delete(event.user);
       }, 5000);
 
@@ -41,7 +41,7 @@ export function useTyping(client: MVChat2Client, conversationId: string): UseTyp
     return () => {
       client.off('typing', handleTyping);
       // Clear all timeouts
-      typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
+      typingTimeouts.current.forEach((timeout: NodeJS.Timeout) => clearTimeout(timeout));
       typingTimeouts.current.clear();
     };
   }, [client, conversationId]);

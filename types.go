@@ -297,7 +297,7 @@ type UserInfo struct {
 // ConversationInfo is conversation data returned in responses.
 type ConversationInfo struct {
 	ID        uuid.UUID       `json:"id"`
-	Type      string          `json:"type"` // "dm" or "group"
+	Type      string          `json:"type"` // "dm" or "room"
 	Public    json.RawMessage `json:"public,omitempty"`
 	Private   json.RawMessage `json:"private,omitempty"`
 	LastSeq   int             `json:"lastSeq"`
