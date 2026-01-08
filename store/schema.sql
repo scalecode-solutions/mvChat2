@@ -136,6 +136,8 @@ CREATE TABLE members (
 
 CREATE INDEX idx_members_user ON members(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_members_favorite ON members(user_id, favorite) WHERE favorite = TRUE AND deleted_at IS NULL;
+-- Composite index for conversation member lookups
+CREATE INDEX idx_members_conv_user ON members(conversation_id, user_id) WHERE deleted_at IS NULL;
 
 -- ============================================================================
 -- MESSAGES
@@ -167,6 +169,7 @@ CREATE TABLE messages (
 
 CREATE INDEX idx_messages_conversation ON messages(conversation_id, seq DESC);
 CREATE INDEX idx_messages_from ON messages(from_user_id);
+CREATE INDEX idx_messages_created ON messages(created_at DESC);
 
 -- ============================================================================
 -- MESSAGE DELETIONS (Soft delete for individual messages)
@@ -176,9 +179,12 @@ CREATE TABLE message_deletions (
     message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     PRIMARY KEY (message_id, user_id)
 );
+
+-- Index for finding all deleted messages for a user
+CREATE INDEX idx_message_deletions_user ON message_deletions(user_id);
 
 -- ============================================================================
 -- FILES
@@ -241,7 +247,7 @@ CREATE TABLE schema_version (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES (4);
+INSERT INTO schema_version (version) VALUES (5);
 
 -- ============================================================================
 -- INVITE CODES
