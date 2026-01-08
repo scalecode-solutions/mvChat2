@@ -1,0 +1,51 @@
+# mvChat2 Server Configuration
+
+server:
+  listen: ":6060"
+  api_path: "/"
+  static_mount: "/"
+  static_path: "./static"
+  use_x_forwarded_for: true
+  default_country_code: "US"
+
+database:
+  host: ${DB_HOST:localhost}
+  port: 5432
+  name: ${DB_NAME:mvchat2}
+  user: ${DB_USER:tmarq}
+  password: ${DB_PASSWORD:}
+  ssl_mode: disable
+  max_open_conns: 50
+  max_idle_conns: 50
+  conn_max_lifetime: 60
+  sql_timeout: 10
+  uid_key: ${UID_KEY:la6YsO+bNX/+XIkOqc5Svw==}
+  encryption_key: ${ENCRYPTION_KEY:}
+
+auth:
+  api_key_salt: ${API_KEY_SALT:T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=}
+  
+  basic:
+    min_login_length: 4
+    min_password_length: 6
+  
+  token:
+    key: ${TOKEN_KEY:wfaY2RgF2S1OQI/ZlK+LSrp1KB2jwAdGAIHQ7JZn+Kc=}
+    expire_in: 1209600    # 2 weeks in seconds
+    serial_number: 1
+
+media:
+  max_size: 8388608       # 8MB
+  upload_dir: "./uploads"
+  gc_period: 60
+  gc_block_size: 100
+
+limits:
+  max_message_size: 131072      # 128KB
+  max_subscriber_count: 128
+  edit_window_minutes: 15
+  unsend_window_minutes: 10
+  max_edit_count: 10
+
+debug:
+  expvar_path: "/debug/vars"

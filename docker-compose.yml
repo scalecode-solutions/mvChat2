@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mvchat2-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mvchat2
+      POSTGRES_PASSWORD: mvchat2_dev
+      POSTGRES_DB: mvchat2
+    volumes:
+      - mvchat2-postgres:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflict with local postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mvchat2 -d mvchat2"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mvchat2:
+    build: .
+    container_name: mvchat2-srv
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "6060:6060"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: mvchat2
+      DB_USER: mvchat2
+      DB_PASSWORD: mvchat2_dev
+    volumes:
+      - mvchat2-uploads:/app/uploads
+    command: ["-init-db"]
+
+volumes:
+  mvchat2-postgres:
+  mvchat2-uploads:
