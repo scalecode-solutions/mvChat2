@@ -138,27 +138,39 @@ func (db *DB) DeleteFile(ctx context.Context, fileID uuid.UUID) error {
 }
 
 // CanAccessFile checks if a user can access a file.
-// For now, only the uploader can access their files.
-// TODO: Check if file is in a message in a conversation the user is a member of.
+// Access is granted if:
+// 1. User is the uploader
+// 2. File is referenced in a message in a conversation the user is a member of
 func (db *DB) CanAccessFile(ctx context.Context, fileID, userID uuid.UUID) (bool, error) {
-	var uploaderID uuid.UUID
+	// Check if user is the uploader OR if file is in a message in a conversation they're a member of
+	// File references are stored in message content (Irido format) as media[].ref = file UUID
+	var hasAccess bool
 	err := db.pool.QueryRow(ctx, `
-		SELECT uploader_id FROM files WHERE id = $1 AND deleted_at IS NULL
-	`, fileID).Scan(&uploaderID)
+		SELECT EXISTS(
+			-- User is the uploader
+			SELECT 1 FROM files
+			WHERE id = $1 AND uploader_id = $2 AND deleted_at IS NULL
 
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
+			UNION ALL
+
+			-- File is referenced in a message in a conversation user is member of
+			SELECT 1 FROM messages m
+			JOIN members mem ON m.conversation_id = mem.conversation_id
+			WHERE mem.user_id = $2
+			AND mem.deleted_at IS NULL
+			AND m.deleted_at IS NULL
+			AND (
+				-- Check if file ID appears in the message content (BYTEA) or head (JSONB)
+				-- Content is Irido format with media[].ref containing file UUIDs
+				m.content::text LIKE '%' || $1::text || '%'
+				OR m.head::text LIKE '%' || $1::text || '%'
+			)
+		)
+	`, fileID, userID).Scan(&hasAccess)
+
 	if err != nil {
 		return false, err
 	}
 
-	// Uploader always has access
-	if uploaderID == userID {
-		return true, nil
-	}
-
-	// TODO: Check if file is referenced in a message in a conversation the user is in
-	// For now, allow access (files are typically shared in messages)
-	return true, nil
+	return hasAccess, nil
 }
