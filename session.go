@@ -30,14 +30,17 @@ type Session struct {
 	conn       *websocket.Conn
 	send       chan *ServerMessage
 	handlers   *Handlers
-	userID     uuid.UUID
-	userAgent  string
-	deviceID   string
-	lang       string
-	ver        string
 	remoteAddr string
 
-	// Last activity timestamp
+	// Protected by mu - accessed from multiple goroutines
+	mu        sync.RWMutex
+	userID    uuid.UUID
+	userAgent string
+	deviceID  string
+	lang      string
+	ver       string
+
+	// Last activity timestamp (atomic access)
 	lastAction int64
 
 	// Closing state
@@ -65,12 +68,52 @@ func (s *Session) ID() string {
 
 // UserID returns the authenticated user ID.
 func (s *Session) UserID() uuid.UUID {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.userID
+}
+
+// SetUserID sets the authenticated user ID.
+// This should be called from Hub.AuthenticateSession.
+func (s *Session) SetUserID(id uuid.UUID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.userID = id
 }
 
 // IsAuthenticated returns true if the session is authenticated.
 func (s *Session) IsAuthenticated() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.userID != uuid.Nil
+}
+
+// UserAgent returns the session's user agent.
+func (s *Session) UserAgent() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.userAgent
+}
+
+// DeviceID returns the session's device ID.
+func (s *Session) DeviceID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.deviceID
+}
+
+// Lang returns the session's language.
+func (s *Session) Lang() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lang
+}
+
+// Ver returns the session's client version.
+func (s *Session) Ver() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ver
 }
 
 // Send queues a message to be sent to the client.
@@ -210,10 +253,13 @@ func (s *Session) dispatch(msg *ClientMessage) {
 // Handler stubs - to be implemented
 func (s *Session) handleHi(msg *ClientMessage) {
 	hi := msg.Hi
+
+	s.mu.Lock()
 	s.ver = hi.Version
 	s.userAgent = hi.UserAgent
 	s.deviceID = hi.DeviceID
 	s.lang = hi.Lang
+	s.mu.Unlock()
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"ver":   "0.1.0",

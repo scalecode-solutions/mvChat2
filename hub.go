@@ -123,9 +123,10 @@ func (h *Hub) addSession(sess *Session) {
 	h.sessions[sess.id] = sess
 
 	// If authenticated, add to user sessions
-	if sess.userID != uuid.Nil {
-		h.userSessions[sess.userID] = append(h.userSessions[sess.userID], sess)
-		h.online[sess.userID] = true
+	userID := sess.UserID()
+	if userID != uuid.Nil {
+		h.userSessions[userID] = append(h.userSessions[userID], sess)
+		h.online[userID] = true
 	}
 }
 
@@ -136,21 +137,22 @@ func (h *Hub) removeSession(sess *Session) {
 	delete(h.sessions, sess.id)
 
 	// Remove from user sessions if authenticated
-	if sess.userID != uuid.Nil {
-		sessions := h.userSessions[sess.userID]
+	userID := sess.UserID()
+	if userID != uuid.Nil {
+		sessions := h.userSessions[userID]
 		for i, s := range sessions {
 			if s.id == sess.id {
-				h.userSessions[sess.userID] = append(sessions[:i], sessions[i+1:]...)
+				h.userSessions[userID] = append(sessions[:i], sessions[i+1:]...)
 				break
 			}
 		}
 		// If no more sessions for this user, mark offline
-		if len(h.userSessions[sess.userID]) == 0 {
-			delete(h.userSessions, sess.userID)
-			delete(h.online, sess.userID)
+		if len(h.userSessions[userID]) == 0 {
+			delete(h.userSessions, userID)
+			delete(h.online, userID)
 			// Broadcast offline presence
 			if h.presence != nil {
-				go h.presence.UserOffline(sess.userID)
+				go h.presence.UserOffline(userID)
 			}
 		}
 	}
@@ -259,21 +261,22 @@ func (h *Hub) AuthenticateSession(sess *Session, userID uuid.UUID) {
 	wasOnline := h.online[userID]
 
 	// Remove from old user if re-authenticating
-	if sess.userID != uuid.Nil && sess.userID != userID {
-		sessions := h.userSessions[sess.userID]
+	oldUserID := sess.UserID()
+	if oldUserID != uuid.Nil && oldUserID != userID {
+		sessions := h.userSessions[oldUserID]
 		for i, s := range sessions {
 			if s.id == sess.id {
-				h.userSessions[sess.userID] = append(sessions[:i], sessions[i+1:]...)
+				h.userSessions[oldUserID] = append(sessions[:i], sessions[i+1:]...)
 				break
 			}
 		}
-		if len(h.userSessions[sess.userID]) == 0 {
-			delete(h.userSessions, sess.userID)
-			delete(h.online, sess.userID)
+		if len(h.userSessions[oldUserID]) == 0 {
+			delete(h.userSessions, oldUserID)
+			delete(h.online, oldUserID)
 		}
 	}
 
-	sess.userID = userID
+	sess.SetUserID(userID)
 	h.userSessions[userID] = append(h.userSessions[userID], sess)
 	h.online[userID] = true
 
