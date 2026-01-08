@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,7 +41,7 @@ func (fh *FileHandlers) SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v0/file/", fh.handleDownload)
 }
 
-// handleUpload handles file uploads.
+// handleUpload handles file uploads with content-based deduplication.
 func (fh *FileHandlers) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -77,30 +78,61 @@ func (fh *FileHandlers) handleUpload(w http.ResponseWriter, r *http.Request) {
 		file.Seek(0, 0)
 	}
 
-	// Create file record
+	// Save file to disk while calculating hash (single pass)
 	fileID := uuid.New()
-	fileRecord, err := fh.db.CreateFile(r.Context(), userID, mimeType, header.Size, "")
+	path, hash, size, err := fh.processor.SaveUploadWithHash(r.Context(), fileID, file, mimeType)
 	if err != nil {
-		http.Error(w, "failed to create file record", http.StatusInternalServerError)
-		return
-	}
-	fileID = fileRecord.ID
-
-	// Save file to disk
-	path, err := fh.processor.SaveUpload(r.Context(), fileID, file, mimeType)
-	if err != nil {
-		fh.db.UpdateFileStatus(r.Context(), fileID, "failed")
 		http.Error(w, "failed to save file", http.StatusInternalServerError)
 		return
 	}
 
-	// Process media (extract metadata, generate thumbnail)
-	go fh.processMedia(fileID, path, mimeType)
+	// Check for existing file with same hash (deduplication)
+	existingFile, err := fh.db.GetFileByHash(r.Context(), hash)
+	if err != nil {
+		log.Printf("files: failed to check hash: %v", err)
+		// Continue without dedup on error
+	}
+
+	var fileRecord *store.File
+
+	if existingFile != nil {
+		// DEDUP HIT: Reuse existing file's storage location
+		log.Printf("files: dedup hit for hash %s, reusing file %s", hash[:16], existingFile.ID)
+
+		// Remove the temp file we just wrote (we'll use existing storage)
+		fh.processor.DeleteFile(fileID, mimeType)
+
+		// Create new file record pointing to existing storage
+		fileRecord, err = fh.db.CreateFileWithHash(r.Context(), userID, existingFile.MimeType, existingFile.Size, existingFile.Location, hash, header.Filename)
+		if err != nil {
+			http.Error(w, "failed to create file record", http.StatusInternalServerError)
+			return
+		}
+
+		// Copy metadata from existing file
+		if meta, _ := fh.db.GetFileMetadata(r.Context(), existingFile.ID); meta != nil {
+			fh.db.CreateFileMetadata(r.Context(), fileRecord.ID, meta.Width, meta.Height, meta.Duration, meta.Thumbnail, meta.Extra)
+		}
+
+		// Mark as ready immediately (no processing needed)
+		fh.db.UpdateFileStatus(r.Context(), fileRecord.ID, "ready")
+	} else {
+		// NEW FILE: Create record and process
+		fileRecord, err = fh.db.CreateFileWithHash(r.Context(), userID, mimeType, size, path, hash, header.Filename)
+		if err != nil {
+			fh.processor.DeleteFile(fileID, mimeType)
+			http.Error(w, "failed to create file record", http.StatusInternalServerError)
+			return
+		}
+
+		// Process media (extract metadata, generate thumbnail)
+		go fh.processMedia(fileRecord.ID, path, mimeType)
+	}
 
 	// Return file info
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, `{"id":"%s","mime":"%s","size":%d}`, fileID, mimeType, header.Size)
+	fmt.Fprintf(w, `{"id":"%s","mime":"%s","size":%d,"deduplicated":%t}`, fileRecord.ID, fileRecord.MimeType, fileRecord.Size, existingFile != nil)
 }
 
 // processMedia processes uploaded media in the background.

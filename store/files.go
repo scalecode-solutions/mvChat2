@@ -12,15 +12,17 @@ import (
 
 // File represents an uploaded file.
 type File struct {
-	ID         uuid.UUID  `json:"id"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
-	UploaderID uuid.UUID  `json:"uploaderId"`
-	Status     string     `json:"status"` // "pending", "ready", "failed"
-	MimeType   string     `json:"mimeType"`
-	Size       int64      `json:"size"`
-	Location   string     `json:"-"` // Internal path, not exposed
-	DeletedAt  *time.Time `json:"deletedAt,omitempty"`
+	ID           uuid.UUID  `json:"id"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+	UploaderID   uuid.UUID  `json:"uploaderId"`
+	Status       string     `json:"status"` // "pending", "ready", "failed"
+	MimeType     string     `json:"mimeType"`
+	Size         int64      `json:"size"`
+	Location     string     `json:"-"`                      // Internal path, not exposed
+	Hash         *string    `json:"-"`                      // SHA-256 hash for deduplication
+	OriginalName *string    `json:"originalName,omitempty"` // Original filename
+	DeletedAt    *time.Time `json:"deletedAt,omitempty"`
 }
 
 // FileMetadata represents additional metadata for a file.
@@ -39,29 +41,44 @@ type FileWithMetadata struct {
 	Metadata *FileMetadata `json:"metadata,omitempty"`
 }
 
-// CreateFile creates a new file record.
+// CreateFile creates a new file record (without hash - for backwards compatibility).
 func (db *DB) CreateFile(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error) {
+	return db.CreateFileWithHash(ctx, uploaderID, mimeType, size, location, "", "")
+}
+
+// CreateFileWithHash creates a new file record with hash and original name for deduplication.
+func (db *DB) CreateFileWithHash(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error) {
 	id := uuid.New()
 	now := time.Now().UTC()
 
+	var hashPtr, namePtr *string
+	if hash != "" {
+		hashPtr = &hash
+	}
+	if originalName != "" {
+		namePtr = &originalName
+	}
+
 	_, err := db.pool.Exec(ctx, `
-		INSERT INTO files (id, created_at, updated_at, uploader_id, status, mime_type, size, location)
-		VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7)
-	`, id, now, now, uploaderID, mimeType, size, location)
+		INSERT INTO files (id, created_at, updated_at, uploader_id, status, mime_type, size, location, hash, original_name)
+		VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)
+	`, id, now, now, uploaderID, mimeType, size, location, hashPtr, namePtr)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &File{
-		ID:         id,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-		UploaderID: uploaderID,
-		Status:     "pending",
-		MimeType:   mimeType,
-		Size:       size,
-		Location:   location,
+		ID:           id,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		UploaderID:   uploaderID,
+		Status:       "pending",
+		MimeType:     mimeType,
+		Size:         size,
+		Location:     location,
+		Hash:         hashPtr,
+		OriginalName: namePtr,
 	}, nil
 }
 
@@ -78,9 +95,9 @@ func (db *DB) UpdateFileStatus(ctx context.Context, fileID uuid.UUID, status str
 func (db *DB) GetFileByID(ctx context.Context, id uuid.UUID) (*File, error) {
 	var f File
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, uploader_id, status, mime_type, size, location, deleted_at
+		SELECT id, created_at, updated_at, uploader_id, status, mime_type, size, location, hash, original_name, deleted_at
 		FROM files WHERE id = $1
-	`, id).Scan(&f.ID, &f.CreatedAt, &f.UpdatedAt, &f.UploaderID, &f.Status, &f.MimeType, &f.Size, &f.Location, &f.DeletedAt)
+	`, id).Scan(&f.ID, &f.CreatedAt, &f.UpdatedAt, &f.UploaderID, &f.Status, &f.MimeType, &f.Size, &f.Location, &f.Hash, &f.OriginalName, &f.DeletedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -89,6 +106,35 @@ func (db *DB) GetFileByID(ctx context.Context, id uuid.UUID) (*File, error) {
 		return nil, err
 	}
 	return &f, nil
+}
+
+// GetFileByHash retrieves a ready file by its content hash.
+// Returns nil if no matching file exists.
+func (db *DB) GetFileByHash(ctx context.Context, hash string) (*File, error) {
+	var f File
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, created_at, updated_at, uploader_id, status, mime_type, size, location, hash, original_name, deleted_at
+		FROM files
+		WHERE hash = $1 AND status = 'ready' AND deleted_at IS NULL
+		LIMIT 1
+	`, hash).Scan(&f.ID, &f.CreatedAt, &f.UpdatedAt, &f.UploaderID, &f.Status, &f.MimeType, &f.Size, &f.Location, &f.Hash, &f.OriginalName, &f.DeletedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+// UpdateFileLocation updates the file's storage location.
+func (db *DB) UpdateFileLocation(ctx context.Context, fileID uuid.UUID, location string) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE files SET location = $2, updated_at = $3 WHERE id = $1
+	`, fileID, location, now)
+	return err
 }
 
 // GetFileWithMetadata retrieves a file with its metadata.
@@ -126,6 +172,23 @@ func (db *DB) CreateFileMetadata(ctx context.Context, fileID uuid.UUID, width, h
 			extra = EXCLUDED.extra
 	`, fileID, width, height, duration, thumbnail, extra)
 	return err
+}
+
+// GetFileMetadata retrieves metadata for a file.
+func (db *DB) GetFileMetadata(ctx context.Context, fileID uuid.UUID) (*FileMetadata, error) {
+	var meta FileMetadata
+	err := db.pool.QueryRow(ctx, `
+		SELECT file_id, width, height, duration, thumbnail, extra
+		FROM file_metadata WHERE file_id = $1
+	`, fileID).Scan(&meta.FileID, &meta.Width, &meta.Height, &meta.Duration, &meta.Thumbnail, &meta.Extra)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &meta, nil
 }
 
 // DeleteFile soft-deletes a file.

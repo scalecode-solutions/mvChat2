@@ -4,6 +4,8 @@ package media
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -57,31 +59,102 @@ type MediaInfo struct {
 
 // SaveUpload saves an uploaded file and returns the storage path.
 func (p *Processor) SaveUpload(ctx context.Context, fileID uuid.UUID, data io.Reader, mimeType string) (string, error) {
+	path, _, _, err := p.SaveUploadWithHash(ctx, fileID, data, mimeType)
+	return path, err
+}
+
+// SaveUploadWithHash saves an uploaded file and returns the storage path, SHA-256 hash, and size.
+// The hash is computed in a single pass while writing the file.
+func (p *Processor) SaveUploadWithHash(ctx context.Context, fileID uuid.UUID, data io.Reader, mimeType string) (path string, hash string, size int64, err error) {
 	// Create directory structure: uploads/ab/cd/abcd1234-...
+	idStr := fileID.String()
+	dir := filepath.Join(p.config.UploadPath, idStr[:2], idStr[2:4])
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", "", 0, fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Determine extension from mime type
+	ext := extensionFromMime(mimeType)
+	filename := idStr + ext
+	path = filepath.Join(dir, filename)
+
+	// Write file while computing hash
+	f, err := os.Create(path)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("failed to create file: %w", err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	mw := io.MultiWriter(f, h)
+
+	size, err = io.Copy(mw, data)
+	if err != nil {
+		os.Remove(path)
+		return "", "", 0, fmt.Errorf("failed to write file: %w", err)
+	}
+
+	hash = hex.EncodeToString(h.Sum(nil))
+	return path, hash, size, nil
+}
+
+// SaveUploadFromPath moves a temp file to permanent storage.
+// Used when file was already written to temp for hash calculation.
+func (p *Processor) SaveUploadFromPath(ctx context.Context, fileID uuid.UUID, tempPath, mimeType string) (string, error) {
 	idStr := fileID.String()
 	dir := filepath.Join(p.config.UploadPath, idStr[:2], idStr[2:4])
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Determine extension from mime type
 	ext := extensionFromMime(mimeType)
 	filename := idStr + ext
 	path := filepath.Join(dir, filename)
 
-	// Write file
-	f, err := os.Create(path)
-	if err != nil {
-		return "", fmt.Errorf("failed to create file: %w", err)
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(f, data); err != nil {
-		os.Remove(path)
-		return "", fmt.Errorf("failed to write file: %w", err)
+	// Move (rename) temp file to permanent location
+	if err := os.Rename(tempPath, path); err != nil {
+		// If rename fails (cross-device), fall back to copy
+		if err := copyFile(tempPath, path); err != nil {
+			return "", fmt.Errorf("failed to move file: %w", err)
+		}
+		os.Remove(tempPath)
 	}
 
 	return path, nil
+}
+
+// copyFile copies a file from src to dst.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
+// CalculateFileHash computes the SHA-256 hash of a file.
+func CalculateFileHash(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // ProcessImage extracts info and generates thumbnail for an image.
@@ -222,6 +295,12 @@ func (p *Processor) GetFilePath(fileID uuid.UUID, mimeType string) string {
 	idStr := fileID.String()
 	ext := extensionFromMime(mimeType)
 	return filepath.Join(p.config.UploadPath, idStr[:2], idStr[2:4], idStr+ext)
+}
+
+// DeleteFile removes a file from disk storage.
+func (p *Processor) DeleteFile(fileID uuid.UUID, mimeType string) error {
+	path := p.GetFilePath(fileID, mimeType)
+	return os.Remove(path)
 }
 
 func extensionFromMime(mimeType string) string {
