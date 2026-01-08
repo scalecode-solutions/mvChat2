@@ -17,7 +17,7 @@ type ClientMessage struct {
 	Acc    *MsgClientAcc    `json:"acc,omitempty"`
 	Search *MsgClientSearch `json:"search,omitempty"`
 	DM     *MsgClientDM     `json:"dm,omitempty"`
-	Group  *MsgClientGroup  `json:"group,omitempty"`
+	Room   *MsgClientRoom   `json:"room,omitempty"`
 	Send   *MsgClientSend   `json:"send,omitempty"`
 	Get    *MsgClientGet    `json:"get,omitempty"`
 	Edit   *MsgClientEdit   `json:"edit,omitempty"`
@@ -96,9 +96,9 @@ type MsgClientDM struct {
 	Private  json.RawMessage `json:"private,omitempty"`
 }
 
-// MsgClientGroup is for group management.
-type MsgClientGroup struct {
-	// Create: "new", Join/Leave/Manage: group ID
+// MsgClientRoom is for room management.
+type MsgClientRoom struct {
+	// Create: "new", Join/Leave/Manage: room ID
 	ID string `json:"id"`
 	// Action: "create", "join", "leave", "invite", "kick", "update"
 	Action string `json:"action"`

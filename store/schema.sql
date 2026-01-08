@@ -54,7 +54,7 @@ CREATE INDEX idx_auth_user ON auth(user_id);
 CREATE INDEX idx_auth_lookup ON auth(scheme, uname) WHERE uname IS NOT NULL;
 
 -- ============================================================================
--- CONVERSATIONS (DMs and Groups)
+-- CONVERSATIONS (DMs and Rooms)
 -- ============================================================================
 
 CREATE TABLE conversations (
@@ -62,13 +62,13 @@ CREATE TABLE conversations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- 'dm' or 'group'
+    -- 'dm' or 'room'
     type VARCHAR(8) NOT NULL,
     
-    -- For groups: owner user ID
+    -- For rooms: owner user ID
     owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     
-    -- For groups: public info (name, avatar, description)
+    -- For rooms: public info (name, avatar, description)
     public JSONB,
     
     -- Message sequence tracking
@@ -108,7 +108,7 @@ CREATE TABLE members (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    -- For groups: 'owner', 'admin', 'member'
+    -- For rooms: 'owner', 'admin', 'member'
     role VARCHAR(16) NOT NULL DEFAULT 'member',
     
     -- Read/receive tracking

@@ -130,39 +130,39 @@ func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMe
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 }
 
-// HandleGroup processes group requests.
-func (h *Handlers) HandleGroup(s *Session, msg *ClientMessage) {
+// HandleRoom processes room requests.
+func (h *Handlers) HandleRoom(s *Session, msg *ClientMessage) {
 	if !s.IsAuthenticated() {
 		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
 		return
 	}
 
-	group := msg.Group
-	if group == nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing group data"))
+	room := msg.Room
+	if room == nil {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing room data"))
 		return
 	}
 
 	ctx := context.Background()
 
-	switch group.Action {
+	switch room.Action {
 	case "create":
-		h.handleCreateGroup(ctx, s, msg, group)
+		h.handleCreateRoom(ctx, s, msg, room)
 	default:
 		// TODO: join, leave, invite, kick, update
 		s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
 	}
 }
 
-func (h *Handlers) handleCreateGroup(ctx context.Context, s *Session, msg *ClientMessage, group *MsgClientGroup) {
+func (h *Handlers) handleCreateRoom(ctx context.Context, s *Session, msg *ClientMessage, room *MsgClientRoom) {
 	var public json.RawMessage
-	if group.Desc != nil {
-		public = group.Desc.Public
+	if room.Desc != nil {
+		public = room.Desc.Public
 	}
 
-	conv, err := h.db.CreateGroup(ctx, s.userID, public)
+	conv, err := h.db.CreateRoom(ctx, s.userID, public)
 	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create group"))
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create room"))
 		return
 	}
 

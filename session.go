@@ -180,8 +180,8 @@ func (s *Session) dispatch(msg *ClientMessage) {
 		s.handleSearch(msg)
 	case msg.DM != nil:
 		s.handleDM(msg)
-	case msg.Group != nil:
-		s.handleGroup(msg)
+	case msg.Room != nil:
+		s.handleRoom(msg)
 	case msg.Send != nil:
 		s.handleSend(msg)
 	case msg.Get != nil:
@@ -236,8 +236,8 @@ func (s *Session) handleDM(msg *ClientMessage) {
 	s.handlers.HandleDM(s, msg)
 }
 
-func (s *Session) handleGroup(msg *ClientMessage) {
-	s.handlers.HandleGroup(s, msg)
+func (s *Session) handleRoom(msg *ClientMessage) {
+	s.handlers.HandleRoom(s, msg)
 }
 
 func (s *Session) handleSend(msg *ClientMessage) {

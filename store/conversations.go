@@ -132,8 +132,8 @@ func (db *DB) CreateDM(ctx context.Context, user1ID, user2ID uuid.UUID) (*Conver
 	}, true, nil
 }
 
-// CreateGroup creates a new group conversation.
-func (db *DB) CreateGroup(ctx context.Context, ownerID uuid.UUID, public json.RawMessage) (*Conversation, error) {
+// CreateRoom creates a new room conversation.
+func (db *DB) CreateRoom(ctx context.Context, ownerID uuid.UUID, public json.RawMessage) (*Conversation, error) {
 	now := time.Now().UTC()
 	convID := uuid.New()
 
@@ -146,7 +146,7 @@ func (db *DB) CreateGroup(ctx context.Context, ownerID uuid.UUID, public json.Ra
 	// Create conversation
 	_, err = tx.Exec(ctx, `
 		INSERT INTO conversations (id, created_at, updated_at, type, owner_id, public)
-		VALUES ($1, $2, $3, 'group', $4, $5)
+		VALUES ($1, $2, $3, 'room', $4, $5)
 	`, convID, now, now, ownerID, public)
 	if err != nil {
 		return nil, err
