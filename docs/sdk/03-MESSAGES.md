@@ -100,7 +100,7 @@ client.on('edit', (info) => {
 
 ## Unsending Messages (Time-Limited)
 
-Unsend removes a message for everyone, but only within a limited time window (e.g., 5 minutes).
+Unsend removes a message for everyone, but only within a **5 minute** time window.
 
 ```typescript
 await client.unsendMessage(conversationId, seq);

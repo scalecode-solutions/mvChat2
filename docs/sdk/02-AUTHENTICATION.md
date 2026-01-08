@@ -88,6 +88,19 @@ client.token;            // Current token or null
 await client.logout();
 ```
 
+## Password Change
+
+```typescript
+await client.changePassword({
+  oldPassword: 'currentPassword123',
+  newPassword: 'newSecurePassword456',
+});
+
+// Throws error if:
+// - Old password is incorrect (403)
+// - New password is too short (400)
+```
+
 ## React Hook
 
 ```typescript
@@ -187,6 +200,17 @@ const result = await client.redeemInvite('0987654321');
   "id": "4",
   "invite": {
     "redeem": "0987654321"
+  }
+}
+```
+
+### Password Change
+```json
+{
+  "id": "5",
+  "acc": {
+    "user": "me",
+    "secret": "base64(oldPassword:newPassword)"
   }
 }
 ```
