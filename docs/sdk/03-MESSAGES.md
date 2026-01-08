@@ -92,13 +92,31 @@ client.on('edit', (info) => {
 });
 ```
 
-## Unsending Messages (Delete for Everyone)
+## Unsending Messages (Time-Limited)
+
+Unsend removes a message for everyone, but only within a limited time window (e.g., 5 minutes).
 
 ```typescript
 await client.unsendMessage(conversationId, seq);
 
+// Throws error if time limit exceeded
+// { code: 403, text: "unsend time limit exceeded" }
+
 // Listen for unsends
 client.on('unsend', (info) => {
+  // { conv: 'uuid', seq: 5, from: 'alice-uuid' }
+});
+```
+
+## Delete for Everyone (Anytime)
+
+Delete for everyone removes any message you sent, at any time.
+
+```typescript
+await client.deleteForEveryone(conversationId, seq);
+
+// Listen for deletions
+client.on('deleteForEveryone', (info) => {
   // { conv: 'uuid', seq: 5, from: 'alice-uuid' }
 });
 ```
