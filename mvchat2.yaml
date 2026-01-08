@@ -74,6 +74,10 @@ limits:
   edit_window_minutes: 15
   unsend_window_minutes: 10
   max_edit_count: 10
+  # Rate limiting (per session)
+  rate_limit_messages: 30       # Max messages per second
+  rate_limit_auth: 5            # Max auth attempts per minute
+  rate_limit_upload: 10         # Max uploads per minute
 
 debug:
   expvar_path: "/debug/vars"

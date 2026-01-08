@@ -99,6 +99,11 @@ type LimitsConfig struct {
 	EditWindowMinutes   int `yaml:"edit_window_minutes"`
 	UnsendWindowMinutes int `yaml:"unsend_window_minutes"`
 	MaxEditCount        int `yaml:"max_edit_count"`
+
+	// Rate limiting (per session/user)
+	RateLimitMessages  int `yaml:"rate_limit_messages"`  // Max messages per second
+	RateLimitAuth      int `yaml:"rate_limit_auth"`      // Max auth attempts per minute
+	RateLimitUpload    int `yaml:"rate_limit_upload"`    // Max uploads per minute
 }
 
 // DebugConfig contains debugging endpoints configuration.
@@ -267,6 +272,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Limits.MaxEditCount == 0 {
 		c.Limits.MaxEditCount = 10
+	}
+	if c.Limits.RateLimitMessages == 0 {
+		c.Limits.RateLimitMessages = 30 // 30 messages per second
+	}
+	if c.Limits.RateLimitAuth == 0 {
+		c.Limits.RateLimitAuth = 5 // 5 auth attempts per minute
+	}
+	if c.Limits.RateLimitUpload == 0 {
+		c.Limits.RateLimitUpload = 10 // 10 uploads per minute
 	}
 }
 
