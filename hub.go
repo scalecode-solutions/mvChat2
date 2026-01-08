@@ -215,14 +215,37 @@ func (h *Hub) SendToUser(userID uuid.UUID, msg *ServerMessage) {
 }
 
 // SendToUsers sends a message to all sessions of multiple users.
+// If Redis is enabled and a user isn't on this node, publishes to Redis for cross-node delivery.
 func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession string) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
+	localUsers := make(map[uuid.UUID]bool)
 	for _, userID := range userIDs {
-		for _, sess := range h.userSessions[userID] {
-			if sess.id != skipSession {
-				sess.Send(msg)
+		sessions := h.userSessions[userID]
+		if len(sessions) > 0 {
+			localUsers[userID] = true
+			for _, sess := range sessions {
+				if sess.id != skipSession {
+					sess.Send(msg)
+				}
+			}
+		}
+	}
+	h.mu.RUnlock()
+
+	// Publish to Redis for users not on this node
+	if h.redis != nil {
+		ctx := context.Background()
+		for _, userID := range userIDs {
+			if !localUsers[userID] {
+				// Check if user is online on another node
+				online, _ := h.redis.IsOnline(ctx, userID.String())
+				if online {
+					payload := PubSubPayload{
+						UserID:  userID.String(),
+						Message: msg,
+					}
+					h.redis.Publish(ctx, "user:"+userID.String(), "data", payload)
+				}
 			}
 		}
 	}

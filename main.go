@@ -107,14 +107,26 @@ func main() {
 	if redisClient != nil {
 		var pubsubCtx context.Context
 		pubsubCtx, pubsubCancel = context.WithCancel(context.Background())
-		pubsub := redisClient.NewPubSub(hub.HandlePubSubMessage)
-		pubsub.SubscribeToNode(pubsubCtx)
-		go pubsub.Listen(pubsubCtx)
+
+		// Subscribe to node-specific channel
+		nodePubsub := redisClient.NewPubSub(hub.HandlePubSubMessage)
+		nodePubsub.SubscribeToNode(pubsubCtx)
+		go nodePubsub.Listen(pubsubCtx)
+
+		// Subscribe to user channels (pattern)
+		userPubsub := redisClient.NewPubSub(hub.HandlePubSubMessage)
+		userPubsub.SubscribeToUsers(pubsubCtx)
+		go userPubsub.Listen(pubsubCtx)
 	}
 
 	// Initialize presence manager
 	presence := NewPresenceManager(hub, db)
 	hub.SetPresence(presence)
+
+	// Start presence heartbeat if Redis is enabled
+	if redisClient != nil {
+		presence.StartHeartbeat(context.Background())
+	}
 
 	// Initialize encryptor for message content
 	encryptor, err := crypto.NewEncryptorFromBase64(cfg.Database.EncryptionKey)

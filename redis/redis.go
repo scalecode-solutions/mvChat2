@@ -75,8 +75,8 @@ func (c *Client) key(k string) string {
 // SetOnline marks a user as online on this node.
 func (c *Client) SetOnline(ctx context.Context, userID string) error {
 	key := c.key("online:" + userID)
-	// Store node ID with 5 minute TTL (refreshed periodically)
-	return c.rdb.Set(ctx, key, c.nodeID, 5*time.Minute).Err()
+	// Store node ID with 2 minute TTL (refreshed every 30 seconds)
+	return c.rdb.Set(ctx, key, c.nodeID, 2*time.Minute).Err()
 }
 
 // SetOffline removes a user's online status.
@@ -105,7 +105,7 @@ func (c *Client) GetOnlineNode(ctx context.Context, userID string) (string, erro
 // RefreshOnline extends the TTL for a user's online status.
 func (c *Client) RefreshOnline(ctx context.Context, userID string) error {
 	key := c.key("online:" + userID)
-	return c.rdb.Expire(ctx, key, 5*time.Minute).Err()
+	return c.rdb.Expire(ctx, key, 2*time.Minute).Err()
 }
 
 // ============================================================================
@@ -149,6 +149,13 @@ func (ps *PubSub) Subscribe(ctx context.Context, channels ...string) error {
 func (ps *PubSub) SubscribeToNode(ctx context.Context) error {
 	channel := ps.client.key("node:" + ps.client.nodeID)
 	ps.pubsub = ps.client.rdb.Subscribe(ctx, channel)
+	return nil
+}
+
+// SubscribeToUsers subscribes to user-specific channels using pattern matching.
+func (ps *PubSub) SubscribeToUsers(ctx context.Context) error {
+	pattern := ps.client.key("ch:user:*")
+	ps.pubsub = ps.client.rdb.PSubscribe(ctx, pattern)
 	return nil
 }
 

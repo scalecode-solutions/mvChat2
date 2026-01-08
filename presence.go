@@ -165,3 +165,37 @@ func (p *PresenceManager) IsOnline(ctx context.Context, userID uuid.UUID) bool {
 
 	return false
 }
+
+// StartHeartbeat starts a goroutine that refreshes online TTLs in Redis.
+func (p *PresenceManager) StartHeartbeat(ctx context.Context) {
+	if p.redis == nil {
+		return
+	}
+
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				p.refreshOnlineUsers(ctx)
+			}
+		}
+	}()
+}
+
+// refreshOnlineUsers refreshes the TTL for all locally online users.
+func (p *PresenceManager) refreshOnlineUsers(ctx context.Context) {
+	p.hub.mu.RLock()
+	userIDs := make([]uuid.UUID, 0, len(p.hub.online))
+	for uid := range p.hub.online {
+		userIDs = append(userIDs, uid)
+	}
+	p.hub.mu.RUnlock()
+
+	for _, uid := range userIDs {
+		p.redis.RefreshOnline(ctx, uid.String())
+	}
+}
