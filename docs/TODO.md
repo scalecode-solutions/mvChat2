@@ -182,6 +182,10 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] No-screenshots preference (stored server-side, enforced client-side)
 - [ ] Graceful maintenance mode (stop accepting new connections, let existing finish)
 - [ ] Session resumption (reconnect with session ID, restore state without re-auth)
+- [ ] History recovery (get missed messages since disconnect)
+- [ ] Delta updates (send only changed fields, reduce bandwidth)
+- [ ] SSE/HTTP-streaming fallback (for environments blocking WebSocket)
+- [ ] Channel patterns/wildcards (subscribe to `room:*`)
 
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface
