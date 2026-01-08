@@ -323,6 +323,36 @@ func (db *DB) UpdateReadSeq(ctx context.Context, convID, userID uuid.UUID, seq i
 	return err
 }
 
+// ReadReceipt represents a user's read status in a conversation.
+type ReadReceipt struct {
+	UserID  uuid.UUID
+	ReadSeq int
+	RecvSeq int
+}
+
+// GetReadReceipts returns read receipts for all members of a conversation.
+func (db *DB) GetReadReceipts(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error) {
+	rows, err := db.pool.Query(ctx, `
+		SELECT user_id, read_seq, recv_seq
+		FROM members
+		WHERE conversation_id = $1 AND deleted_at IS NULL
+	`, convID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var receipts []ReadReceipt
+	for rows.Next() {
+		var r ReadReceipt
+		if err := rows.Scan(&r.UserID, &r.ReadSeq, &r.RecvSeq); err != nil {
+			return nil, err
+		}
+		receipts = append(receipts, r)
+	}
+	return receipts, rows.Err()
+}
+
 // IsMember checks if a user is a member of a conversation.
 func (db *DB) IsMember(ctx context.Context, convID, userID uuid.UUID) (bool, error) {
 	var exists bool

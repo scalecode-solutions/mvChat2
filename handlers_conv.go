@@ -194,6 +194,8 @@ func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
 		h.handleGetMessages(ctx, s, msg, get)
 	case "members":
 		h.handleGetMembers(ctx, s, msg, get)
+	case "receipts":
+		h.handleGetReceipts(ctx, s, msg, get)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown what"))
 	}
@@ -340,6 +342,49 @@ func (h *Handlers) handleGetMembers(ctx context.Context, s *Session, msg *Client
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"members": results,
+	}))
+}
+
+func (h *Handlers) handleGetReceipts(ctx context.Context, s *Session, msg *ClientMessage, get *MsgClientGet) {
+	if get.ConversationID == "" {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing conv"))
+		return
+	}
+
+	convID, err := uuid.Parse(get.ConversationID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+		return
+	}
+
+	// Check membership
+	isMember, err := h.db.IsMember(ctx, convID, s.userID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if !isMember {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+
+	receipts, err := h.db.GetReadReceipts(ctx, convID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get receipts"))
+		return
+	}
+
+	results := make([]map[string]any, 0, len(receipts))
+	for _, r := range receipts {
+		results = append(results, map[string]any{
+			"user":    r.UserID.String(),
+			"readSeq": r.ReadSeq,
+			"recvSeq": r.RecvSeq,
+		})
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"receipts": results,
 	}))
 }
 
