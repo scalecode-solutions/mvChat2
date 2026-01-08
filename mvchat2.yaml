@@ -12,6 +12,9 @@ server:
   write_timeout: 15
   idle_timeout: 60
   shutdown_timeout: 30
+  # CORS allowed origins - use ["*"] for development only!
+  # For production, specify exact origins: ["https://app.example.com"]
+  allowed_origins: ["*"]
 
 database:
   host: ${DB_HOST:localhost}

@@ -6,31 +6,34 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/scalecode-solutions/mvchat2/config"
+	"github.com/scalecode-solutions/mvchat2/middleware"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:    1024,
-	WriteBufferSize:   1024,
-	EnableCompression: true,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
-	},
-}
 
 // Server handles HTTP and WebSocket connections.
 type Server struct {
 	hub      *Hub
 	config   *config.Config
 	handlers *Handlers
+	upgrader websocket.Upgrader
 }
 
 // NewServer creates a new server.
 func NewServer(hub *Hub, cfg *config.Config, handlers *Handlers) *Server {
-	return &Server{
+	s := &Server{
 		hub:      hub,
 		config:   cfg,
 		handlers: handlers,
 	}
+
+	// Configure WebSocket upgrader with origin checking
+	s.upgrader = websocket.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true,
+		CheckOrigin:       middleware.CheckOrigin(cfg.Server.AllowedOrigins),
+	}
+
+	return s
 }
 
 // SetupRoutes configures HTTP routes.
@@ -42,7 +45,7 @@ func (s *Server) SetupRoutes(mux *http.ServeMux) {
 
 // handleWebSocket upgrades HTTP to WebSocket and creates a session.
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Printf("WebSocket upgrade failed: %v\n", err)
 		return

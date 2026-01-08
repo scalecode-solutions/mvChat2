@@ -17,6 +17,7 @@ import (
 	"github.com/scalecode-solutions/mvchat2/crypto"
 	"github.com/scalecode-solutions/mvchat2/email"
 	"github.com/scalecode-solutions/mvchat2/media"
+	"github.com/scalecode-solutions/mvchat2/middleware"
 	"github.com/scalecode-solutions/mvchat2/redis"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
@@ -177,10 +178,21 @@ func main() {
 	srv.SetupRoutes(mux)
 	fileHandlers.SetupRoutes(mux)
 
+	// Configure CORS middleware
+	corsMiddleware := middleware.CORS(middleware.CORSConfig{
+		AllowedOrigins: cfg.Server.AllowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Requested-With"},
+		MaxAge:         86400, // 24 hours
+	})
+
+	// Wrap handler with CORS middleware
+	handler := corsMiddleware(mux)
+
 	// Start HTTP server with timeouts
 	httpServer := &http.Server{
 		Addr:         cfg.Server.Listen,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,

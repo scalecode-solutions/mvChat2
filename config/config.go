@@ -34,6 +34,10 @@ type ServerConfig struct {
 	WriteTimeout    int `yaml:"write_timeout"`
 	IdleTimeout     int `yaml:"idle_timeout"`
 	ShutdownTimeout int `yaml:"shutdown_timeout"`
+	// CORS configuration
+	// Use "*" to allow all origins (not recommended for production)
+	// Use specific origins like ["https://example.com", "https://app.example.com"]
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 // DatabaseConfig contains PostgreSQL connection settings.
