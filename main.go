@@ -12,6 +12,7 @@ import (
 
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/config"
+	"github.com/scalecode-solutions/mvchat2/crypto"
 	"github.com/scalecode-solutions/mvchat2/media"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
@@ -84,8 +85,15 @@ func main() {
 	presence := NewPresenceManager(hub, db)
 	hub.SetPresence(presence)
 
+	// Initialize encryptor for message content
+	encryptor, err := crypto.NewEncryptorFromBase64(cfg.Database.EncryptionKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize encryptor: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Initialize handlers
-	handlers := NewHandlers(db, authService, hub)
+	handlers := NewHandlers(db, authService, hub, encryptor)
 
 	// Initialize media processor
 	mediaProcessor := media.NewProcessor(media.Config{

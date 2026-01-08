@@ -7,22 +7,25 @@ import (
 	"strings"
 
 	"github.com/scalecode-solutions/mvchat2/auth"
+	"github.com/scalecode-solutions/mvchat2/crypto"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
 // Handlers holds dependencies for request handlers.
 type Handlers struct {
-	db   *store.DB
-	auth *auth.Auth
-	hub  *Hub
+	db        *store.DB
+	auth      *auth.Auth
+	hub       *Hub
+	encryptor *crypto.Encryptor
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub) *Handlers {
+func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor) *Handlers {
 	return &Handlers{
-		db:   db,
-		auth: a,
-		hub:  hub,
+		db:        db,
+		auth:      a,
+		hub:       hub,
+		encryptor: enc,
 	}
 }
 

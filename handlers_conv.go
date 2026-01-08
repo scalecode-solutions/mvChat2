@@ -277,7 +277,13 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s *Session, msg *Clien
 		if m.DeletedAt != nil {
 			item["deleted"] = true
 		} else {
-			item["content"] = m.Content // TODO: decrypt
+			// Decrypt content
+			plaintext, err := h.encryptor.Decrypt(m.Content)
+			if err == nil {
+				item["content"] = plaintext
+			} else {
+				item["content"] = m.Content // Fallback for unencrypted messages
+			}
 		}
 		if m.Head != nil {
 			item["head"] = m.Head
@@ -394,8 +400,12 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 		head, _ = json.Marshal(map[string]any{"reply_to": send.ReplyTo})
 	}
 
-	// TODO: Encrypt content
-	content := []byte(send.Content)
+	// Encrypt content
+	content, err := h.encryptor.Encrypt(send.Content)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "encryption failed"))
+		return
+	}
 
 	// Create message
 	message, err := h.db.CreateMessage(ctx, convID, s.userID, content, head)
@@ -481,8 +491,12 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	// TODO: Encrypt content
-	content := []byte(edit.Content)
+	// Encrypt content
+	content, err := h.encryptor.Encrypt(edit.Content)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "encryption failed"))
+		return
+	}
 
 	if err := h.db.EditMessage(ctx, convID, edit.Seq, content); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to edit"))

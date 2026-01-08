@@ -20,7 +20,7 @@ database:
   conn_max_lifetime: 60
   sql_timeout: 10
   uid_key: ${UID_KEY:la6YsO+bNX/+XIkOqc5Svw==}
-  encryption_key: ${ENCRYPTION_KEY:}
+  encryption_key: ${ENCRYPTION_KEY:k8Jz9mN2pQ4rT6vX8yB1dF3hK5nP7sU0wA2cE4gI6jL=}
 
 auth:
   api_key_salt: ${API_KEY_SALT:T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=}
