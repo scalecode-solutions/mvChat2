@@ -12,6 +12,7 @@ import (
 
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/config"
+	"github.com/scalecode-solutions/mvchat2/media"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
@@ -86,10 +87,24 @@ func main() {
 	// Initialize handlers
 	handlers := NewHandlers(db, authService, hub)
 
+	// Initialize media processor
+	mediaProcessor := media.NewProcessor(media.Config{
+		UploadPath:    cfg.Media.UploadDir,
+		MaxUploadSize: cfg.Media.MaxSize,
+		ThumbWidth:    256,
+		ThumbHeight:   256,
+		ThumbQuality:  80,
+	})
+
+	// Initialize file handlers
+	authValidator := auth.NewValidator(authService)
+	fileHandlers := NewFileHandlers(db, mediaProcessor, authValidator)
+
 	// Initialize server
 	srv := NewServer(hub, cfg, handlers)
 	mux := http.NewServeMux()
 	srv.SetupRoutes(mux)
+	fileHandlers.SetupRoutes(mux)
 
 	// Start HTTP server
 	httpServer := &http.Server{
