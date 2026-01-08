@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"html"
 	"html/template"
+	"net/mail"
 	"net/smtp"
+	"regexp"
+	"strings"
 )
 
 // Config holds email configuration.
@@ -40,12 +44,24 @@ func (s *Service) SendInvite(toEmail, toName, code, inviterName string) error {
 		return nil
 	}
 
-	subject := fmt.Sprintf("%s invited you to chat on mvChat", inviterName)
+	// Validate email address
+	if _, err := mail.ParseAddress(toEmail); err != nil {
+		return fmt.Errorf("invalid email address: %w", err)
+	}
 
+	// Sanitize inputs to prevent header injection and HTML injection
+	safeInviterName := sanitizeForHeader(inviterName)
+	if safeInviterName == "" {
+		safeInviterName = "Someone"
+	}
+
+	subject := fmt.Sprintf("%s invited you to chat on mvChat", safeInviterName)
+
+	// HTML-escape all user-controlled data for the template
 	data := map[string]string{
-		"ToName":      toName,
-		"InviterName": inviterName,
-		"Code":        code,
+		"ToName":      html.EscapeString(sanitizeForDisplay(toName)),
+		"InviterName": html.EscapeString(safeInviterName),
+		"Code":        html.EscapeString(code),
 		"Link":        "https://chat.mvchat.app",
 	}
 
@@ -58,9 +74,14 @@ func (s *Service) SendInvite(toEmail, toName, code, inviterName string) error {
 }
 
 func (s *Service) send(to, subject, body string) error {
+	// Sanitize header values to prevent header injection
+	safeTo := sanitizeForHeader(to)
+	safeSubject := sanitizeForHeader(subject)
+
 	from := s.cfg.From
 	if s.cfg.FromName != "" {
-		from = fmt.Sprintf("%s <%s>", s.cfg.FromName, s.cfg.From)
+		safeFromName := sanitizeForHeader(s.cfg.FromName)
+		from = fmt.Sprintf("%s <%s>", safeFromName, s.cfg.From)
 	}
 
 	msg := fmt.Sprintf("From: %s\r\n"+
@@ -69,7 +90,7 @@ func (s *Service) send(to, subject, body string) error {
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
 		"\r\n"+
-		"%s", from, to, subject, body)
+		"%s", from, safeTo, safeSubject, body)
 
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
@@ -169,6 +190,41 @@ func (s *Service) renderTemplate(tmpl string, data any) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// headerInjectionRegex matches characters that could be used for header injection
+var headerInjectionRegex = regexp.MustCompile(`[\r\n\x00]`)
+
+// sanitizeForHeader removes characters that could be used for email header injection.
+// This prevents attackers from injecting additional headers like BCC.
+func sanitizeForHeader(s string) string {
+	// Remove CR, LF, and null bytes that could inject headers
+	s = headerInjectionRegex.ReplaceAllString(s, "")
+	// Trim whitespace
+	s = strings.TrimSpace(s)
+	// Limit length to prevent buffer issues
+	if len(s) > 200 {
+		s = s[:200]
+	}
+	return s
+}
+
+// sanitizeForDisplay cleans user input for display purposes.
+// Removes control characters but keeps the text readable.
+func sanitizeForDisplay(s string) string {
+	// Remove control characters except space
+	var result strings.Builder
+	for _, r := range s {
+		if r >= 32 || r == '\t' {
+			result.WriteRune(r)
+		}
+	}
+	s = strings.TrimSpace(result.String())
+	// Limit length
+	if len(s) > 200 {
+		s = s[:200]
+	}
+	return s
 }
 
 const inviteTemplate = `<!DOCTYPE html>
