@@ -186,44 +186,49 @@ CREATE TABLE message_deletions (
 
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
+    uploader_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     -- File info
     mime_type VARCHAR(128) NOT NULL,
     size BIGINT NOT NULL,
     original_name VARCHAR(512),
-    
+
     -- Storage location (path on disk)
     location VARCHAR(512) NOT NULL,
-    
-    -- SHA-256 hash for deduplication
-    hash VARCHAR(64) NOT NULL,
-    
-    -- Status: 0 = active, 1 = pending deletion
-    status INT NOT NULL DEFAULT 0
+
+    -- SHA-256 hash for deduplication (nullable until hash feature implemented)
+    hash VARCHAR(64),
+
+    -- Status: 'pending', 'ready', 'failed'
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+
+    -- Soft delete
+    deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_files_user ON files(user_id);
-CREATE INDEX idx_files_hash ON files(hash);
+CREATE INDEX idx_files_uploader ON files(uploader_id);
+CREATE INDEX idx_files_hash ON files(hash) WHERE hash IS NOT NULL;
+CREATE INDEX idx_files_status ON files(status) WHERE status = 'pending';
 
 CREATE TABLE file_metadata (
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
-    
+
     -- Media dimensions
     width INT,
     height INT,
-    duration_seconds INT,
-    
-    -- Thumbnail/preview paths
-    has_thumbnail BOOLEAN NOT NULL DEFAULT FALSE,
-    thumbnail_path VARCHAR(512),
-    
-    -- Extended metadata (EXIF, etc.)
-    metadata JSONB,
-    
+
+    -- Duration in seconds for audio/video (float for precision)
+    duration FLOAT,
+
+    -- Thumbnail data (base64 encoded JPEG stored in DB for simplicity)
+    thumbnail TEXT,
+
+    -- Extended metadata (EXIF, codec info, etc.)
+    extra JSONB,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -236,7 +241,7 @@ CREATE TABLE schema_version (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES (1);
+INSERT INTO schema_version (version) VALUES (4);
 
 -- ============================================================================
 -- INVITE CODES
