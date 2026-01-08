@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/scalecode-solutions/mvchat2/media"
@@ -137,7 +138,8 @@ func (fh *FileHandlers) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 // processMedia processes uploaded media in the background.
 func (fh *FileHandlers) processMedia(fileID uuid.UUID, path, mimeType string) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
 	var info *media.MediaInfo
 	var err error

@@ -156,8 +156,15 @@ func main() {
 		FromName: cfg.Email.FromName,
 	})
 
+	// Initialize invite token generator (uses token key, 7-day TTL)
+	inviteTokenGen, err := crypto.NewInviteTokenGenerator(tokenKey, 7*24*time.Hour)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize invite token generator: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Initialize handlers
-	handlers := NewHandlers(db, authService, hub, encryptor, emailService)
+	handlers := NewHandlers(db, authService, hub, encryptor, emailService, inviteTokenGen)
 
 	// Initialize media processor
 	mediaProcessor := media.NewProcessor(media.Config{

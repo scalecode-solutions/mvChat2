@@ -21,7 +21,8 @@ func (h *Handlers) HandleDM(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	// Start DM with user
 	if dm.User != "" {
@@ -136,7 +137,8 @@ func (h *Handlers) HandleRoom(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	switch room.Action {
 	case "create":
@@ -177,7 +179,8 @@ func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	switch get.What {
 	case "conversations":
@@ -429,7 +432,8 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(send.ConversationID)
 	if err != nil {
@@ -525,7 +529,8 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(edit.ConversationID)
 	if err != nil {
@@ -609,7 +614,8 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(unsend.ConversationID)
 	if err != nil {
@@ -674,7 +680,8 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(del.ConversationID)
 	if err != nil {
@@ -741,7 +748,8 @@ func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(react.ConversationID)
 	if err != nil {
@@ -795,7 +803,8 @@ func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(typing.ConversationID)
 	if err != nil {
@@ -834,7 +843,8 @@ func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	convID, err := uuid.Parse(read.ConversationID)
 	if err != nil {

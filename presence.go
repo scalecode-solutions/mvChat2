@@ -28,7 +28,8 @@ func NewPresenceManager(hub *Hub, db *store.DB) *PresenceManager {
 
 // UserOnline is called when a user comes online (first session connects).
 func (p *PresenceManager) UserOnline(userID uuid.UUID) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Update Redis presence cache if enabled
 	if p.redis != nil {
@@ -53,7 +54,8 @@ func (p *PresenceManager) UserOnline(userID uuid.UUID) {
 
 // UserOffline is called when a user goes offline (last session disconnects).
 func (p *PresenceManager) UserOffline(userID uuid.UUID) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Remove from Redis presence cache if enabled
 	if p.redis != nil {
@@ -122,7 +124,8 @@ func (p *PresenceManager) getPresenceSubscribers(ctx context.Context, userID uui
 // SendPresenceProbe sends current online status of requested users.
 // Called when a client wants to know who's online.
 func (p *PresenceManager) SendPresenceProbe(s *Session, userIDs []uuid.UUID) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	for _, uid := range userIDs {
 		user, err := p.db.GetUserByID(ctx, uid)

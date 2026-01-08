@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/scalecode-solutions/mvchat2/redis"
@@ -239,7 +240,8 @@ func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession s
 
 	// Publish to Redis for users not on this node
 	if h.redis != nil {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		for _, userID := range userIDs {
 			if !localUsers[userID] {
 				// Check if user is online on another node

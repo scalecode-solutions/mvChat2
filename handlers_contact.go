@@ -18,7 +18,8 @@ func (h *Handlers) HandleContact(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	switch {
 	case contact.Add != "":

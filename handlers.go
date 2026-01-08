@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/crypto"
@@ -12,23 +13,33 @@ import (
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
+// Default timeout for handler database operations.
+const handlerTimeout = 30 * time.Second
+
+// handlerCtx creates a context with the standard handler timeout.
+func handlerCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), handlerTimeout)
+}
+
 // Handlers holds dependencies for request handlers.
 type Handlers struct {
-	db        *store.DB
-	auth      *auth.Auth
-	hub       *Hub
-	encryptor *crypto.Encryptor
-	email     *email.Service
+	db           *store.DB
+	auth         *auth.Auth
+	hub          *Hub
+	encryptor    *crypto.Encryptor
+	email        *email.Service
+	inviteTokens *crypto.InviteTokenGenerator
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service) *Handlers {
+func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service, inviteTokens *crypto.InviteTokenGenerator) *Handlers {
 	return &Handlers{
-		db:        db,
-		auth:      a,
-		hub:       hub,
-		encryptor: enc,
-		email:     emailSvc,
+		db:           db,
+		auth:         a,
+		hub:          hub,
+		encryptor:    enc,
+		email:        emailSvc,
+		inviteTokens: inviteTokens,
 	}
 }
 
@@ -40,7 +51,8 @@ func (h *Handlers) HandleLogin(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	switch login.Scheme {
 	case "basic":
@@ -164,7 +176,8 @@ func (h *Handlers) HandleAcc(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 
 	switch acc.User {
 	case "new":
@@ -246,7 +259,7 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 	// If invite code provided, redeem it (creates DMs and contacts with inviters)
 	var connectedInviters []string
 	if acc.InviteCode != "" {
-		inviters, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID)
+		inviters, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID, username)
 		if err != nil {
 			// Log but don't fail account creation
 		}
@@ -372,7 +385,8 @@ func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := handlerCtx()
+	defer cancel()
 	users, err := h.db.SearchUsers(ctx, search.Query, search.Limit)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "search failed"))

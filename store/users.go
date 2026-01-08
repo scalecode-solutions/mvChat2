@@ -150,6 +150,19 @@ func (db *DB) GetAuthByUserID(ctx context.Context, userID uuid.UUID) (*AuthRecor
 	return &auth, nil
 }
 
+// GetUserUsername retrieves the username for a user (from basic auth).
+func (db *DB) GetUserUsername(ctx context.Context, userID uuid.UUID) (string, error) {
+	var uname string
+	err := db.pool.QueryRow(ctx, `
+		SELECT uname FROM auth WHERE user_id = $1 AND scheme = 'basic'
+	`, userID).Scan(&uname)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return uname, err
+}
+
 // SearchUsers searches for users by display name (from public.fn field).
 func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User, error) {
 	if limit <= 0 || limit > 50 {
