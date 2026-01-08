@@ -18,15 +18,17 @@ var upgrader = websocket.Upgrader{
 
 // Server handles HTTP and WebSocket connections.
 type Server struct {
-	hub    *Hub
-	config *config.Config
+	hub      *Hub
+	config   *config.Config
+	handlers *Handlers
 }
 
 // NewServer creates a new server.
-func NewServer(hub *Hub, cfg *config.Config) *Server {
+func NewServer(hub *Hub, cfg *config.Config, handlers *Handlers) *Server {
 	return &Server{
-		hub:    hub,
-		config: cfg,
+		hub:      hub,
+		config:   cfg,
+		handlers: handlers,
 	}
 }
 
@@ -52,7 +54,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sess := NewSession(s.hub, conn, remoteAddr)
+	sess := NewSession(s.hub, conn, remoteAddr, s.handlers)
 	s.hub.Register(sess)
 
 	// Run the session (blocks until session closes)

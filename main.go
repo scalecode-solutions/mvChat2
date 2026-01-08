@@ -1,13 +1,16 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/config"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
@@ -59,12 +62,28 @@ func main() {
 		fmt.Printf("Schema version: %d\n", version)
 	}
 
+	// Initialize auth
+	tokenKey, err := base64.StdEncoding.DecodeString(cfg.Auth.Token.Key)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to decode token key: %v\n", err)
+		os.Exit(1)
+	}
+	authService := auth.New(auth.Config{
+		TokenKey:          tokenKey,
+		TokenExpiry:       time.Duration(cfg.Auth.Token.ExpireIn) * time.Second,
+		MinUsernameLength: cfg.Auth.Basic.MinLoginLength,
+		MinPasswordLength: cfg.Auth.Basic.MinPasswordLength,
+	})
+
 	// Initialize hub
 	hub := NewHub()
 	go hub.Run()
 
+	// Initialize handlers
+	handlers := NewHandlers(db, authService, hub)
+
 	// Initialize server
-	srv := NewServer(hub, cfg)
+	srv := NewServer(hub, cfg, handlers)
 	mux := http.NewServeMux()
 	srv.SetupRoutes(mux)
 

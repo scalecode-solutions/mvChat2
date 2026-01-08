@@ -29,6 +29,7 @@ type Session struct {
 	hub        *Hub
 	conn       *websocket.Conn
 	send       chan *ServerMessage
+	handlers   *Handlers
 	userID     uuid.UUID
 	userAgent  string
 	deviceID   string
@@ -45,12 +46,13 @@ type Session struct {
 }
 
 // NewSession creates a new session.
-func NewSession(hub *Hub, conn *websocket.Conn, remoteAddr string) *Session {
+func NewSession(hub *Hub, conn *websocket.Conn, remoteAddr string, handlers *Handlers) *Session {
 	return &Session{
 		id:         uuid.New().String(),
 		hub:        hub,
 		conn:       conn,
 		send:       make(chan *ServerMessage, sendBufferSize),
+		handlers:   handlers,
 		remoteAddr: remoteAddr,
 		lastAction: time.Now().UnixNano(),
 	}
@@ -217,22 +219,15 @@ func (s *Session) handleHi(msg *ClientMessage) {
 }
 
 func (s *Session) handleLogin(msg *ClientMessage) {
-	// TODO: Implement authentication
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleLogin(s, msg)
 }
 
 func (s *Session) handleAcc(msg *ClientMessage) {
-	// TODO: Implement account creation/update
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleAcc(s, msg)
 }
 
 func (s *Session) handleSearch(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement user search
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleSearch(s, msg)
 }
 
 func (s *Session) handleDM(msg *ClientMessage) {
