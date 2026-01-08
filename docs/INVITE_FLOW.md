@@ -190,3 +190,20 @@ Future audio calls will use WebRTC WITHOUT iOS CallKit. This prevents calls from
 
 ### Private Rooms Only
 All rooms are private/invite-only by default. No public room discovery - doesn't fit the DV survivor use case.
+
+### Triple-Layer Security
+1. **E2EE (client-to-client)** - Messages encrypted on sender's device, decrypted on recipient's device. Server never sees plaintext.
+2. **Encryption at rest (AES-GCM)** - Server stores the already-E2EE ciphertext, then encrypts it again. Double encrypted.
+3. **Soft delete + admin restore** - Nothing is truly deleted. If abuser finds phone and deletes evidence, admin can restore soft-deleted messages.
+
+### Evidence Preservation
+- All deletes are soft deletes (records kept with `deleted_at` timestamp)
+- Admin can restore deleted messages for a user
+- User exports as plaintext (their client has E2EE keys)
+- Evidence preserved for court proceedings
+
+### Subpoena-Proof
+- Server only stores double-encrypted blobs
+- No plaintext ever touches the server
+- Even with a court order, only encrypted data can be provided
+- Only the clients hold the decryption keys
