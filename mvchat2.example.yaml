@@ -1,4 +1,14 @@
-# mvChat2 Server Configuration
+# mvChat2 Server Configuration - Example
+#
+# Copy this file to mvchat2.yaml and configure all REQUIRED fields.
+#
+# IMPORTANT: All cryptographic keys MUST be unique for each deployment.
+# Generate new keys with: openssl rand -base64 32
+#
+# For production deployments:
+# 1. Set all keys via environment variables (recommended)
+# 2. Enable SSL/TLS for database connections
+# 3. Use strong passwords for all services
 
 server:
   listen: ":6060"
@@ -14,14 +24,16 @@ database:
   name: ${DB_NAME:mvchat2}
   user: ${DB_USER:postgres}
   password: ${DB_PASSWORD:}
-  ssl_mode: disable
+  ssl_mode: disable  # Use 'require' or 'verify-full' in production
   max_open_conns: 50
   max_idle_conns: 50
   conn_max_lifetime: 60
   sql_timeout: 10
-  # REQUIRED: Generate with: openssl rand -base64 16
+  # REQUIRED: Unique key for UID generation
+  # Generate with: openssl rand -base64 16
   uid_key: ${UID_KEY:}
-  # REQUIRED: Generate with: openssl rand -base64 32 (must be 32+ chars for AES-256)
+  # REQUIRED: Encryption key for data at rest (AES-256)
+  # Generate with: openssl rand -base64 32
   encryption_key: ${ENCRYPTION_KEY:}
 
 redis:
@@ -33,23 +45,25 @@ redis:
 
 email:
   enabled: ${EMAIL_ENABLED:false}
-  host: ${EMAIL_HOST:mail5010.site4now.net}
+  host: ${EMAIL_HOST:smtp.example.com}
   port: ${EMAIL_PORT:465}
-  username: ${EMAIL_USERNAME:noreply@mvchat.app}
+  username: ${EMAIL_USERNAME:}
   password: ${EMAIL_PASSWORD:}
-  from: ${EMAIL_FROM:noreply@mvchat.app}
+  from: ${EMAIL_FROM:noreply@example.com}
   from_name: ${EMAIL_FROM_NAME:mvChat}
 
 auth:
-  # REQUIRED: Generate with: openssl rand -base64 32
+  # REQUIRED: Salt for API key hashing
+  # Generate with: openssl rand -base64 32
   api_key_salt: ${API_KEY_SALT:}
 
   basic:
     min_login_length: 4
-    min_password_length: 6
+    min_password_length: 8  # Recommend 8+ for production
 
   token:
-    # REQUIRED: Generate with: openssl rand -base64 32 (must be 32+ chars)
+    # REQUIRED: Secret key for JWT signing
+    # Generate with: openssl rand -base64 32
     key: ${TOKEN_KEY:}
     expire_in: 1209600    # 2 weeks in seconds
     serial_number: 1
@@ -64,8 +78,8 @@ limits:
   max_message_size: 131072      # 128KB
   max_subscriber_count: 128
   edit_window_minutes: 15
-  unsend_window_minutes: 10
+  unsend_window_minutes: 5
   max_edit_count: 10
 
 debug:
-  expvar_path: "/debug/vars"
+  expvar_path: ""  # Disable in production (set empty string)

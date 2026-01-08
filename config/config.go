@@ -249,16 +249,58 @@ func (c *Config) applyDefaults() {
 	}
 }
 
-// validate checks that required fields are set.
+// knownInsecureKeys contains default keys that must not be used in production.
+// These are checked to prevent accidental deployment with example/default keys.
+var knownInsecureKeys = map[string]bool{
+	"la6YsO+bNX/+XIkOqc5Svw==":                         true, // Default UID key
+	"k8Jz9mN2pQ4rT6vX8yB1dF3hK5nP7sU0wA2cE4gI6jL=":     true, // Default encryption key
+	"T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=":     true, // Default API key salt
+	"wfaY2RgF2S1OQI/ZlK+LSrp1KB2jwAdGAIHQ7JZn+Kc=":     true, // Default token key
+	"your-256-bit-secret-key-here":                     true, // Common placeholder
+	"your-secret-key":                                  true, // Common placeholder
+	"changeme":                                         true, // Common placeholder
+	"secret":                                           true, // Common placeholder
+}
+
+// validate checks that required fields are set and secure.
 func (c *Config) validate() error {
+	// Validate API key salt
 	if c.Auth.APIKeySalt == "" {
 		return fmt.Errorf("auth.api_key_salt is required")
 	}
+	if knownInsecureKeys[c.Auth.APIKeySalt] {
+		return fmt.Errorf("auth.api_key_salt is using an insecure default value - generate a new key")
+	}
+
+	// Validate token key
 	if c.Auth.Token.Key == "" {
 		return fmt.Errorf("auth.token.key is required")
 	}
+	if knownInsecureKeys[c.Auth.Token.Key] {
+		return fmt.Errorf("auth.token.key is using an insecure default value - generate a new key")
+	}
+	if len(c.Auth.Token.Key) < 32 {
+		return fmt.Errorf("auth.token.key must be at least 32 characters")
+	}
+
+	// Validate UID key
 	if c.Database.UIDKey == "" {
 		return fmt.Errorf("database.uid_key is required")
 	}
+	if knownInsecureKeys[c.Database.UIDKey] {
+		return fmt.Errorf("database.uid_key is using an insecure default value - generate a new key")
+	}
+
+	// Validate encryption key
+	if c.Database.EncryptionKey == "" {
+		return fmt.Errorf("database.encryption_key is required")
+	}
+	if knownInsecureKeys[c.Database.EncryptionKey] {
+		return fmt.Errorf("database.encryption_key is using an insecure default value - generate a new key")
+	}
+	if len(c.Database.EncryptionKey) < 32 {
+		return fmt.Errorf("database.encryption_key must be at least 32 characters (for AES-256)")
+	}
+
 	return nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -29,7 +30,14 @@ var buildstamp = "dev"
 func main() {
 	configFile := flag.String("config", "mvchat2.yaml", "Path to config file")
 	initDB := flag.Bool("init-db", false, "Initialize database schema")
+	generateKeys := flag.Bool("generate-keys", false, "Generate secure cryptographic keys and exit")
 	flag.Parse()
+
+	// Handle key generation
+	if *generateKeys {
+		printGeneratedKeys()
+		return
+	}
 
 	fmt.Printf("mvChat2 v%s (build: %s)\n", currentVersion, buildstamp)
 
@@ -193,4 +201,38 @@ func main() {
 	}
 	hub.Shutdown()
 	httpServer.Close()
+}
+
+// generateSecureKey generates a cryptographically secure random key.
+func generateSecureKey(bytes int) string {
+	key := make([]byte, bytes)
+	if _, err := cryptorand.Read(key); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to generate secure key: %v\n", err)
+		os.Exit(1)
+	}
+	return base64.StdEncoding.EncodeToString(key)
+}
+
+// printGeneratedKeys outputs secure keys for configuration.
+func printGeneratedKeys() {
+	fmt.Println("# Generated secure keys for mvChat2 configuration")
+	fmt.Println("# Copy these values to your mvchat2.yaml or set as environment variables")
+	fmt.Println("#")
+	fmt.Println("# WARNING: These keys are generated fresh each time.")
+	fmt.Println("# Changing keys after deployment will invalidate existing data!")
+	fmt.Println("")
+	fmt.Println("# Environment variables (recommended for production):")
+	fmt.Printf("export UID_KEY='%s'\n", generateSecureKey(16))
+	fmt.Printf("export ENCRYPTION_KEY='%s'\n", generateSecureKey(32))
+	fmt.Printf("export API_KEY_SALT='%s'\n", generateSecureKey(32))
+	fmt.Printf("export TOKEN_KEY='%s'\n", generateSecureKey(32))
+	fmt.Println("")
+	fmt.Println("# Or YAML configuration:")
+	fmt.Println("database:")
+	fmt.Printf("  uid_key: %s\n", generateSecureKey(16))
+	fmt.Printf("  encryption_key: %s\n", generateSecureKey(32))
+	fmt.Println("auth:")
+	fmt.Printf("  api_key_salt: %s\n", generateSecureKey(32))
+	fmt.Println("  token:")
+	fmt.Printf("    key: %s\n", generateSecureKey(32))
 }
