@@ -102,7 +102,7 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *Client
 	h.hub.AuthenticateSession(s, user.ID)
 
 	// Update last seen
-	h.db.UpdateUserLastSeen(ctx, user.ID, s.userAgent)
+	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"user":    user.ID.String(),
@@ -137,7 +137,7 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *Client
 	h.hub.AuthenticateSession(s, user.ID)
 
 	// Update last seen
-	h.db.UpdateUserLastSeen(ctx, user.ID, s.userAgent)
+	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
 
 	// Generate new token (refresh)
 	token, expiresAt, err := h.auth.GenerateToken(user.ID)
