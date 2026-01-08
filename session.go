@@ -198,6 +198,8 @@ func (s *Session) dispatch(msg *ClientMessage) {
 		s.handleTyping(msg)
 	case msg.Read != nil:
 		s.handleRead(msg)
+	case msg.Invite != nil:
+		s.handleInvite(msg)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown message type"))
 	}
@@ -268,4 +270,8 @@ func (s *Session) handleTyping(msg *ClientMessage) {
 
 func (s *Session) handleRead(msg *ClientMessage) {
 	s.handlers.HandleRead(s, msg)
+}
+
+func (s *Session) handleInvite(msg *ClientMessage) {
+	s.handlers.HandleInvite(s, msg)
 }

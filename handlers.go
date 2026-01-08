@@ -240,6 +240,19 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		return
 	}
 
+	// If invite code provided, redeem it (creates DM with inviter)
+	var inviterID *string
+	if acc.InviteCode != "" {
+		inviter, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID)
+		if err != nil {
+			// Log but don't fail account creation
+		}
+		if inviter != nil {
+			id := inviter.String()
+			inviterID = &id
+		}
+	}
+
 	// If login requested, authenticate
 	if acc.Login {
 		h.hub.AuthenticateSession(s, userID)
@@ -250,21 +263,29 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 			return
 		}
 
-		s.Send(CtrlSuccess(msg.ID, CodeCreated, map[string]any{
+		params := map[string]any{
 			"user":    userID.String(),
 			"token":   token,
 			"expires": expiresAt,
 			"desc": map[string]any{
 				"public": public,
 			},
-		}))
+		}
+		if inviterID != nil {
+			params["inviter"] = *inviterID
+		}
+		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	} else {
-		s.Send(CtrlSuccess(msg.ID, CodeCreated, map[string]any{
+		params := map[string]any{
 			"user": userID.String(),
 			"desc": map[string]any{
 				"public": public,
 			},
-		}))
+		}
+		if inviterID != nil {
+			params["inviter"] = *inviterID
+		}
+		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	}
 }
 

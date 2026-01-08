@@ -26,6 +26,7 @@ type ClientMessage struct {
 	React  *MsgClientReact  `json:"react,omitempty"`
 	Typing *MsgClientTyping `json:"typing,omitempty"`
 	Read   *MsgClientRead   `json:"read,omitempty"`
+	Invite *MsgClientInvite `json:"invite,omitempty"`
 }
 
 // ServerMessage is a message from server to client.
@@ -66,6 +67,8 @@ type MsgClientAcc struct {
 	Secret string      `json:"secret,omitempty"`
 	Login  bool        `json:"login,omitempty"`
 	Desc   *MsgSetDesc `json:"desc,omitempty"`
+	// For invite-based signup: the 10-digit invite code
+	InviteCode string `json:"inviteCode,omitempty"`
 }
 
 // MsgSetDesc is public/private data for account or conversation.
@@ -203,6 +206,22 @@ type MsgServerPres struct {
 	UserID   string     `json:"user"`
 	What     string     `json:"what"` // "on", "off"
 	LastSeen *time.Time `json:"lastSeen,omitempty"`
+}
+
+// MsgClientInvite is for invite code management.
+type MsgClientInvite struct {
+	// Create a new invite
+	Create *MsgClientInviteCreate `json:"create,omitempty"`
+	// List user's invites
+	List bool `json:"list,omitempty"`
+	// Revoke an invite by ID
+	Revoke string `json:"revoke,omitempty"`
+}
+
+// MsgClientInviteCreate is for creating an invite.
+type MsgClientInviteCreate struct {
+	Email string `json:"email"`
+	Name  string `json:"name,omitempty"`
 }
 
 // ============================================================================

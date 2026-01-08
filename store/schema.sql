@@ -237,3 +237,37 @@ CREATE TABLE schema_version (
 );
 
 INSERT INTO schema_version (version) VALUES (1);
+
+-- ============================================================================
+-- INVITE CODES
+-- ============================================================================
+
+CREATE TABLE invite_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Who created the invite
+    inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- 10-digit numeric code
+    code VARCHAR(10) NOT NULL UNIQUE,
+    
+    -- Recipient email (for sending the invite)
+    email VARCHAR(255) NOT NULL,
+    
+    -- Optional: display name for the invitee
+    invitee_name VARCHAR(128),
+    
+    -- Status: 'pending', 'used', 'expired', 'revoked'
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    
+    -- When the code was used (if used)
+    used_at TIMESTAMPTZ,
+    used_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days')
+);
+
+CREATE INDEX idx_invite_codes_inviter ON invite_codes(inviter_id);
+CREATE INDEX idx_invite_codes_code ON invite_codes(code) WHERE status = 'pending';
+CREATE INDEX idx_invite_codes_email ON invite_codes(email);
