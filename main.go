@@ -79,6 +79,10 @@ func main() {
 	hub := NewHub()
 	go hub.Run()
 
+	// Initialize presence manager
+	presence := NewPresenceManager(hub, db)
+	hub.SetPresence(presence)
+
 	// Initialize handlers
 	handlers := NewHandlers(db, authService, hub)
 

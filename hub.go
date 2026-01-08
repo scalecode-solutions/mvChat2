@@ -21,6 +21,9 @@ type Hub struct {
 	register   chan *Session
 	unregister chan *Session
 	shutdown   chan struct{}
+
+	// Presence manager (set after initialization)
+	presence *PresenceManager
 }
 
 // NewHub creates a new Hub instance.
@@ -55,6 +58,11 @@ func (h *Hub) Run() {
 // Shutdown gracefully shuts down the hub.
 func (h *Hub) Shutdown() {
 	close(h.shutdown)
+}
+
+// SetPresence sets the presence manager.
+func (h *Hub) SetPresence(p *PresenceManager) {
+	h.presence = p
 }
 
 // Register adds a session to the hub.
@@ -99,7 +107,10 @@ func (h *Hub) removeSession(sess *Session) {
 		if len(h.userSessions[sess.userID]) == 0 {
 			delete(h.userSessions, sess.userID)
 			delete(h.online, sess.userID)
-			// TODO: Broadcast offline presence
+			// Broadcast offline presence
+			if h.presence != nil {
+				go h.presence.UserOffline(sess.userID)
+			}
 		}
 	}
 }
@@ -179,7 +190,9 @@ func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession s
 // AuthenticateSession associates a session with a user ID.
 func (h *Hub) AuthenticateSession(sess *Session, userID uuid.UUID) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+
+	// Check if this is the first session for this user
+	wasOnline := h.online[userID]
 
 	// Remove from old user if re-authenticating
 	if sess.userID != uuid.Nil && sess.userID != userID {
@@ -199,4 +212,11 @@ func (h *Hub) AuthenticateSession(sess *Session, userID uuid.UUID) {
 	sess.userID = userID
 	h.userSessions[userID] = append(h.userSessions[userID], sess)
 	h.online[userID] = true
+
+	h.mu.Unlock()
+
+	// Broadcast online presence if this is the first session
+	if !wasOnline && h.presence != nil {
+		go h.presence.UserOnline(userID)
+	}
 }
