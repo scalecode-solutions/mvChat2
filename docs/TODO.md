@@ -175,6 +175,11 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Account suspension (`suspended_at`, `suspended_reason`)
 - [ ] Admin endpoints for user management
 - [ ] User language preference in profile (for client-side translation)
+- [ ] Scheduled messages (send at future time)
+- [ ] Pinned messages in rooms
+- [ ] Disappearing messages (auto soft-delete after X time)
+- [ ] Location sharing for emergencies
+- [ ] No-screenshots preference (stored server-side, enforced client-side)
 
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface
@@ -185,6 +190,8 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] File upload/download
 - [ ] Contacts management
 - [ ] Profile settings
+- [ ] Integrated PDF viewer (no external app trail)
+- [ ] Screenshot blocking (based on server preference)
 
 ## Design Decisions
 
