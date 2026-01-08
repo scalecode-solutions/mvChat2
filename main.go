@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -58,10 +59,27 @@ func main() {
 		fmt.Printf("Schema version: %d\n", version)
 	}
 
-	fmt.Printf("Listening on %s\n", cfg.Server.Listen)
+	// Initialize hub
+	hub := NewHub()
+	go hub.Run()
 
-	// TODO: Initialize hub
-	// TODO: Start HTTP/WebSocket server
+	// Initialize server
+	srv := NewServer(hub, cfg)
+	mux := http.NewServeMux()
+	srv.SetupRoutes(mux)
+
+	// Start HTTP server
+	httpServer := &http.Server{
+		Addr:    cfg.Server.Listen,
+		Handler: mux,
+	}
+
+	go func() {
+		fmt.Printf("Listening on %s\n", cfg.Server.Listen)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
+		}
+	}()
 
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
@@ -69,4 +87,6 @@ func main() {
 	<-quit
 
 	fmt.Println("Shutting down...")
+	hub.Shutdown()
+	httpServer.Close()
 }
