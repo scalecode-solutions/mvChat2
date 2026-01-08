@@ -165,7 +165,8 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Store email on user account (currently only in invite)
 - [ ] Email verification flow
 - [ ] SMS invite codes (alternative to email)
-- [ ] Message search (metadata only - sender, date, conversation; content search is client-side due to E2EE)
+- [ ] Message search (metadata only - sender, date, conversation)
+- [ ] User-controlled encrypted search index (client builds, encrypts, uploads; only user can search their own content)
 - [ ] Full room permissions (admin/kick/ban)
 - [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
 - [ ] Webhooks (optional - for enterprise/professional integrations)
