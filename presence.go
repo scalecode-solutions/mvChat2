@@ -5,26 +5,34 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/scalecode-solutions/mvchat2/redis"
 	"github.com/scalecode-solutions/mvchat2/store"
 )
 
 // PresenceManager handles online/offline status and notifications.
 type PresenceManager struct {
-	hub *Hub
-	db  *store.DB
+	hub   *Hub
+	db    *store.DB
+	redis *redis.Client
 }
 
 // NewPresenceManager creates a new presence manager.
 func NewPresenceManager(hub *Hub, db *store.DB) *PresenceManager {
 	return &PresenceManager{
-		hub: hub,
-		db:  db,
+		hub:   hub,
+		db:    db,
+		redis: hub.redis,
 	}
 }
 
 // UserOnline is called when a user comes online (first session connects).
 func (p *PresenceManager) UserOnline(userID uuid.UUID) {
 	ctx := context.Background()
+
+	// Update Redis presence cache if enabled
+	if p.redis != nil {
+		p.redis.SetOnline(ctx, userID.String())
+	}
 
 	// Get all users who should be notified (DM partners and group members)
 	notifyUsers := p.getPresenceSubscribers(ctx, userID)
@@ -45,6 +53,11 @@ func (p *PresenceManager) UserOnline(userID uuid.UUID) {
 // UserOffline is called when a user goes offline (last session disconnects).
 func (p *PresenceManager) UserOffline(userID uuid.UUID) {
 	ctx := context.Background()
+
+	// Remove from Redis presence cache if enabled
+	if p.redis != nil {
+		p.redis.SetOffline(ctx, userID.String())
+	}
 
 	// Update last_seen in database
 	p.db.UpdateUserLastSeen(ctx, userID, "")
@@ -117,7 +130,7 @@ func (p *PresenceManager) SendPresenceProbe(s *Session, userIDs []uuid.UUID) {
 		}
 
 		var presMsg *ServerMessage
-		if p.hub.IsOnline(uid) {
+		if p.IsOnline(ctx, uid) {
 			presMsg = &ServerMessage{
 				Pres: &MsgServerPres{
 					UserID: uid.String(),
@@ -135,4 +148,20 @@ func (p *PresenceManager) SendPresenceProbe(s *Session, userIDs []uuid.UUID) {
 		}
 		s.Send(presMsg)
 	}
+}
+
+// IsOnline checks if a user is online (locally or via Redis).
+func (p *PresenceManager) IsOnline(ctx context.Context, userID uuid.UUID) bool {
+	// Check local hub first
+	if p.hub.IsOnline(userID) {
+		return true
+	}
+
+	// Check Redis if enabled (user might be on another node)
+	if p.redis != nil {
+		online, _ := p.redis.IsOnline(ctx, userID.String())
+		return online
+	}
+
+	return false
 }
