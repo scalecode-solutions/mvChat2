@@ -81,14 +81,20 @@ const messages = await client.getMessages(conversationId, {
 
 ## Editing Messages
 
+Editing is limited to 10 edits per message within 15 minutes of sending. After that, the message is locked.
+
 ```typescript
 await client.editMessage(conversationId, seq, {
   text: 'Updated message text',
 });
 
+// Throws error if limit exceeded
+// { code: 403, text: "edit limit exceeded" }
+// { code: 403, text: "edit time limit exceeded" }
+
 // Listen for edits
 client.on('edit', (info) => {
-  // { conv: 'uuid', seq: 5, from: 'alice-uuid', content: {...} }
+  // { conv: 'uuid', seq: 5, from: 'alice-uuid', content: {...}, editCount: 3 }
 });
 ```
 
