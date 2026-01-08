@@ -231,91 +231,41 @@ func (s *Session) handleSearch(msg *ClientMessage) {
 }
 
 func (s *Session) handleDM(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement DM start/manage
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleDM(s, msg)
 }
 
 func (s *Session) handleGroup(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement group management
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleGroup(s, msg)
 }
 
 func (s *Session) handleSend(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement message sending
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleSend(s, msg)
 }
 
 func (s *Session) handleGet(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement data fetching
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleGet(s, msg)
 }
 
 func (s *Session) handleEdit(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement message editing
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleEdit(s, msg)
 }
 
 func (s *Session) handleUnsend(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement message unsending
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleUnsend(s, msg)
 }
 
 func (s *Session) handleDelete(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement message deletion
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleDelete(s, msg)
 }
 
 func (s *Session) handleReact(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement reactions
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleReact(s, msg)
 }
 
 func (s *Session) handleTyping(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement typing indicator
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleTyping(s, msg)
 }
 
 func (s *Session) handleRead(msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
-		return
-	}
-	// TODO: Implement read receipts
-	s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+	s.handlers.HandleRead(s, msg)
 }
