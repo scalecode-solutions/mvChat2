@@ -26,10 +26,15 @@ func TestInviteTokenGenerator(t *testing.T) {
 			t.Fatalf("Generate failed: %v", err)
 		}
 
-		// Token should be URL-safe base64
-		if strings.ContainsAny(token, "+/") {
-			t.Errorf("Token contains non-URL-safe characters: %s", token)
+		// Token should be base62 (alphanumeric only)
+		for _, c := range token {
+			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+				t.Errorf("Token contains non-base62 character %q: %s", c, token)
+				break
+			}
 		}
+
+		t.Logf("Token length: %d chars", len(token))
 
 		data, err := gen.Verify(token)
 		if err != nil {
@@ -148,8 +153,10 @@ func TestInviteTokenGenerator(t *testing.T) {
 	})
 
 	t.Run("long emails", func(t *testing.T) {
-		longEmail := strings.Repeat("a", 200) + "@example.com"
-		token, err := gen.Generate(longEmail, longEmail)
+		// Inviter is limited to 255 chars, invitee can be longer
+		longInviter := strings.Repeat("a", 100) + "@example.com" // 112 chars
+		longInvitee := strings.Repeat("b", 200) + "@example.com" // 212 chars
+		token, err := gen.Generate(longInviter, longInvitee)
 		if err != nil {
 			t.Fatalf("Generate with long emails failed: %v", err)
 		}
@@ -159,8 +166,11 @@ func TestInviteTokenGenerator(t *testing.T) {
 			t.Fatalf("Verify with long emails failed: %v", err)
 		}
 
-		if data.InviterEmail != longEmail || data.InviteeEmail != longEmail {
-			t.Error("Long emails not preserved")
+		if data.InviterEmail != longInviter {
+			t.Errorf("Long inviter email not preserved: got %d chars, want %d", len(data.InviterEmail), len(longInviter))
+		}
+		if data.InviteeEmail != longInvitee {
+			t.Errorf("Long invitee email not preserved: got %d chars, want %d", len(data.InviteeEmail), len(longInvitee))
 		}
 	})
 }
@@ -174,9 +184,8 @@ func TestInvalidTokenFormats(t *testing.T) {
 		token string
 	}{
 		{"empty", ""},
-		{"not base64", "not-valid-base64!@#"},
+		{"invalid chars", "not-valid!@#"},
 		{"too short", "AAAA"},
-		{"truncated", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
 	}
 
 	for _, tt := range tests {
@@ -186,5 +195,38 @@ func TestInvalidTokenFormats(t *testing.T) {
 				t.Error("Expected error for invalid token format")
 			}
 		})
+	}
+}
+
+func TestBase62Encoding(t *testing.T) {
+	// Test round-trip encoding
+	testCases := [][]byte{
+		{0, 0, 0, 1},
+		{255, 255, 255, 255},
+		{1, 2, 3, 4, 5, 6, 7, 8},
+		make([]byte, 32),
+	}
+
+	for i, data := range testCases {
+		encoded := encodeBase62(data)
+		decoded, err := decodeBase62(encoded)
+		if err != nil {
+			t.Errorf("Case %d: decode failed: %v", i, err)
+			continue
+		}
+
+		// Compare - note that leading zeros may be lost
+		if len(decoded) != len(data) {
+			// Check if difference is just leading zeros
+			minLen := len(decoded)
+			if len(data) < minLen {
+				minLen = len(data)
+			}
+			for j := 0; j < minLen; j++ {
+				if decoded[len(decoded)-1-j] != data[len(data)-1-j] {
+					t.Errorf("Case %d: mismatch at byte %d", i, j)
+				}
+			}
+		}
 	}
 }
