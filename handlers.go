@@ -163,11 +163,12 @@ func (h *Handlers) HandleAcc(s *Session, msg *ClientMessage) {
 
 	ctx := context.Background()
 
-	if acc.User == "new" {
+	switch acc.User {
+	case "new":
 		h.handleCreateAccount(ctx, s, msg, acc)
-	} else if acc.User == "me" {
+	case "me":
 		h.handleUpdateAccount(ctx, s, msg, acc)
-	} else {
+	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid user field"))
 	}
 }
