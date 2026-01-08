@@ -645,8 +645,8 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	// Check time window (10 minutes)
-	if time.Since(origMsg.CreatedAt) > 10*time.Minute {
+	// Check time window (5 minutes)
+	if time.Since(origMsg.CreatedAt) > 5*time.Minute {
 		s.Send(CtrlError(msg.ID, CodeForbidden, "unsend window expired"))
 		return
 	}
