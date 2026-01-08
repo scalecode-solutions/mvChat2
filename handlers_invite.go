@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/mail"
 	"strings"
 
@@ -77,7 +78,13 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 		toName = *name
 	}
 	if h.email != nil && h.email.IsEnabled() {
-		go h.email.SendInvite(invite.Email, toName, invite.Code, inviterName)
+		go func() {
+			if err := h.email.SendInvite(invite.Email, toName, invite.Code, inviterName); err != nil {
+				fmt.Printf("Failed to send invite email to %s: %v\n", invite.Email, err)
+			} else {
+				fmt.Printf("Invite email sent to %s\n", invite.Email)
+			}
+		}()
 	}
 
 	s.Send(CtrlSuccess(msg.ID, CodeCreated, map[string]any{
