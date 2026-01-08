@@ -2,7 +2,7 @@
 # Build: docker build -t mvchat2:latest .
 # Run: docker run -p 6060:6060 -e DB_HOST=host.docker.internal mvchat2:latest
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git
 
