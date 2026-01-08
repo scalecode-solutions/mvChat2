@@ -179,6 +179,8 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Scheduled messages (send at future time)
 - [ ] Pinned messages in rooms
 - [ ] Disappearing messages (auto soft-delete after X time)
+- [ ] Unsend time limit enforcement (configurable, e.g., 5 minutes)
+- [ ] Delete for everyone (separate from unsend, no time limit)
 - [ ] Location sharing for emergencies
 - [ ] Pre-recorded distress messages (record when safe, send with one tap when in danger)
 - [ ] Emergency quick-send to all trusted contacts
