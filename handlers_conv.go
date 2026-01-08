@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/scalecode-solutions/mvchat2/store"
 )
 
 // HandleDM processes DM requests (start DM, manage settings).
@@ -101,27 +102,21 @@ func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMe
 		return
 	}
 
-	// Build updates
-	updates := make(map[string]any)
-	if dm.Favorite != nil {
-		updates["favorite"] = *dm.Favorite
-	}
-	if dm.Muted != nil {
-		updates["muted"] = *dm.Muted
-	}
-	if dm.Blocked != nil {
-		updates["blocked"] = *dm.Blocked
-	}
-	if dm.Private != nil {
-		updates["private"] = dm.Private
+	// Build settings update
+	settings := store.MemberSettings{
+		Favorite: dm.Favorite,
+		Muted:    dm.Muted,
+		Blocked:  dm.Blocked,
+		Private:  dm.Private,
 	}
 
-	if len(updates) == 0 {
+	// Check if any updates provided
+	if settings.Favorite == nil && settings.Muted == nil && settings.Blocked == nil && settings.Private == nil {
 		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 		return
 	}
 
-	if err := h.db.UpdateMemberSettings(ctx, convID, s.userID, updates); err != nil {
+	if err := h.db.UpdateMemberSettings(ctx, convID, s.userID, settings); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update"))
 		return
 	}

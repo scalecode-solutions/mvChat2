@@ -291,26 +291,28 @@ func (db *DB) GetConversationMembers(ctx context.Context, convID uuid.UUID) ([]u
 	return members, rows.Err()
 }
 
+// MemberSettings holds updateable member settings.
+type MemberSettings struct {
+	Favorite *bool
+	Muted    *bool
+	Blocked  *bool
+	Private  json.RawMessage
+}
+
 // UpdateMemberSettings updates a member's settings (favorite, muted, blocked, private).
-func (db *DB) UpdateMemberSettings(ctx context.Context, convID, userID uuid.UUID, updates map[string]any) error {
-	updates["updated_at"] = time.Now().UTC()
+// Only non-nil fields are updated.
+func (db *DB) UpdateMemberSettings(ctx context.Context, convID, userID uuid.UUID, settings MemberSettings) error {
+	now := time.Now().UTC()
 
-	// Build dynamic UPDATE query
-	setClauses := ""
-	args := []any{convID, userID}
-	i := 3
-	for key, val := range updates {
-		if setClauses != "" {
-			setClauses += ", "
-		}
-		setClauses += key + " = $" + string(rune('0'+i))
-		args = append(args, val)
-		i++
-	}
-
-	// This is a simplified version - in production use a query builder
-	query := "UPDATE members SET " + setClauses + " WHERE conversation_id = $1 AND user_id = $2"
-	_, err := db.pool.Exec(ctx, query, args...)
+	_, err := db.pool.Exec(ctx, `
+		UPDATE members SET
+			favorite = COALESCE($3, favorite),
+			muted = COALESCE($4, muted),
+			blocked = COALESCE($5, blocked),
+			private = COALESCE($6, private),
+			updated_at = $7
+		WHERE conversation_id = $1 AND user_id = $2
+	`, convID, userID, settings.Favorite, settings.Muted, settings.Blocked, settings.Private, now)
 	return err
 }
 
