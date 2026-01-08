@@ -12,21 +12,22 @@ type ClientMessage struct {
 	ID string `json:"id,omitempty"`
 
 	// Only one of these should be set
-	Hi     *MsgClientHi     `json:"hi,omitempty"`
-	Login  *MsgClientLogin  `json:"login,omitempty"`
-	Acc    *MsgClientAcc    `json:"acc,omitempty"`
-	Search *MsgClientSearch `json:"search,omitempty"`
-	DM     *MsgClientDM     `json:"dm,omitempty"`
-	Room   *MsgClientRoom   `json:"room,omitempty"`
-	Send   *MsgClientSend   `json:"send,omitempty"`
-	Get    *MsgClientGet    `json:"get,omitempty"`
-	Edit   *MsgClientEdit   `json:"edit,omitempty"`
-	Unsend *MsgClientUnsend `json:"unsend,omitempty"`
-	Delete *MsgClientDelete `json:"delete,omitempty"`
-	React  *MsgClientReact  `json:"react,omitempty"`
-	Typing *MsgClientTyping `json:"typing,omitempty"`
-	Read   *MsgClientRead   `json:"read,omitempty"`
-	Invite *MsgClientInvite `json:"invite,omitempty"`
+	Hi      *MsgClientHi      `json:"hi,omitempty"`
+	Login   *MsgClientLogin   `json:"login,omitempty"`
+	Acc     *MsgClientAcc     `json:"acc,omitempty"`
+	Search  *MsgClientSearch  `json:"search,omitempty"`
+	DM      *MsgClientDM      `json:"dm,omitempty"`
+	Room    *MsgClientRoom    `json:"room,omitempty"`
+	Send    *MsgClientSend    `json:"send,omitempty"`
+	Get     *MsgClientGet     `json:"get,omitempty"`
+	Edit    *MsgClientEdit    `json:"edit,omitempty"`
+	Unsend  *MsgClientUnsend  `json:"unsend,omitempty"`
+	Delete  *MsgClientDelete  `json:"delete,omitempty"`
+	React   *MsgClientReact   `json:"react,omitempty"`
+	Typing  *MsgClientTyping  `json:"typing,omitempty"`
+	Read    *MsgClientRead    `json:"read,omitempty"`
+	Invite  *MsgClientInvite  `json:"invite,omitempty"`
+	Contact *MsgClientContact `json:"contact,omitempty"`
 }
 
 // ServerMessage is a message from server to client.
@@ -216,12 +217,25 @@ type MsgClientInvite struct {
 	List bool `json:"list,omitempty"`
 	// Revoke an invite by ID
 	Revoke string `json:"revoke,omitempty"`
+	// Redeem an invite code (for existing users)
+	Redeem string `json:"redeem,omitempty"`
 }
 
 // MsgClientInviteCreate is for creating an invite.
 type MsgClientInviteCreate struct {
 	Email string `json:"email"`
 	Name  string `json:"name,omitempty"`
+}
+
+// MsgClientContact is for contact management.
+type MsgClientContact struct {
+	// Add a user as contact
+	Add string `json:"add,omitempty"`
+	// Remove a contact
+	Remove string `json:"remove,omitempty"`
+	// Update nickname for a contact
+	User     string  `json:"user,omitempty"`
+	Nickname *string `json:"nickname,omitempty"`
 }
 
 // ============================================================================

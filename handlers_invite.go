@@ -32,6 +32,8 @@ func (h *Handlers) HandleInvite(s *Session, msg *ClientMessage) {
 		h.handleListInvites(ctx, s, msg)
 	case invite.Revoke != "":
 		h.handleRevokeInvite(ctx, s, msg, invite.Revoke)
+	case invite.Redeem != "":
+		h.handleRedeemInviteExisting(ctx, s, msg, invite.Redeem)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid invite request"))
 	}
@@ -146,6 +148,44 @@ func (h *Handlers) handleRevokeInvite(ctx context.Context, s *Session, msg *Clie
 	}
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+}
+
+// handleRedeemInviteExisting allows an existing logged-in user to redeem an invite code.
+// This connects them with the inviter without creating a new account.
+func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, msg *ClientMessage, code string) {
+	// Use the invite code
+	invite, err := h.db.UseInviteCode(ctx, code, s.userID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to redeem invite"))
+		return
+	}
+	if invite == nil {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "invite code not found or expired"))
+		return
+	}
+
+	// Create DM and contact with the inviter
+	conv, _, err := h.db.CreateDM(ctx, invite.InviterID, s.userID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create conversation"))
+		return
+	}
+
+	// Add as contacts
+	h.db.AddContact(ctx, invite.InviterID, s.userID, "invite", &invite.ID)
+
+	// Get inviter info
+	inviter, _ := h.db.GetUserByID(ctx, invite.InviterID)
+	var inviterPublic any
+	if inviter != nil {
+		inviterPublic = inviter.Public
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"inviter":       invite.InviterID.String(),
+		"inviterPublic": inviterPublic,
+		"conv":          conv.ID.String(),
+	}))
 }
 
 // RedeemInviteCode processes invite code redemption (signup via invite).
