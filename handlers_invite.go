@@ -70,11 +70,19 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 		return
 	}
 
-	// Generate short code from the token
+	// Generate short code from the token (before encryption)
 	shortCode := h.inviteTokens.ShortCode(token)
 
-	// Create invite record in database with both code and token
-	invite, err := h.db.CreateInviteCode(ctx, s.userID, shortCode, token, inviteeEmail, name)
+	// Encrypt token for secure database storage
+	encryptedToken, err := h.inviteTokens.EncryptForStorage(token)
+	if err != nil {
+		log.Printf("invite: failed to encrypt token: %v", err)
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create invite"))
+		return
+	}
+
+	// Create invite record in database with both code and encrypted token
+	invite, err := h.db.CreateInviteCode(ctx, s.userID, shortCode, encryptedToken, inviteeEmail, name)
 	if err != nil {
 		log.Printf("invite: failed to create invite: %v", err)
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create invite"))
@@ -185,8 +193,16 @@ func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, m
 		return
 	}
 
-	// Verify the full cryptographic token stored in DB
-	_, err = h.inviteTokens.Verify(invite.Token)
+	// Decrypt the token from database storage
+	token, err := h.inviteTokens.DecryptFromStorage(invite.Token)
+	if err != nil {
+		log.Printf("invite: failed to decrypt token: %v", err)
+		s.Send(CtrlError(msg.ID, CodeNotFound, "invalid invite code"))
+		return
+	}
+
+	// Verify the decrypted cryptographic token
+	_, err = h.inviteTokens.Verify(token)
 	if err != nil {
 		if err == crypto.ErrInviteTokenExpired {
 			s.Send(CtrlError(msg.ID, CodeNotFound, "invite code expired"))
@@ -244,8 +260,14 @@ func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID 
 		return nil, nil // Not found, but not a hard error
 	}
 
-	// Verify the full cryptographic token stored in DB
-	_, err = h.inviteTokens.Verify(invite.Token)
+	// Decrypt the token from database storage
+	token, err := h.inviteTokens.DecryptFromStorage(invite.Token)
+	if err != nil {
+		return nil, nil // Decryption failed
+	}
+
+	// Verify the decrypted cryptographic token
+	_, err = h.inviteTokens.Verify(token)
 	if err != nil {
 		return nil, nil // Invalid or expired token
 	}

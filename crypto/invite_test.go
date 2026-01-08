@@ -245,3 +245,107 @@ func TestShortCode(t *testing.T) {
 
 	t.Logf("Sample short code: %s", code)
 }
+
+func TestTokenEncryption(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
+	}
+
+	gen, err := NewInviteTokenGenerator(key, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("NewInviteTokenGenerator failed: %v", err)
+	}
+
+	// Generate a token
+	token, err := gen.Generate("alice@example.com", "bob@example.com")
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	t.Run("encrypt and decrypt", func(t *testing.T) {
+		// Encrypt for storage
+		encrypted, err := gen.EncryptForStorage(token)
+		if err != nil {
+			t.Fatalf("EncryptForStorage failed: %v", err)
+		}
+
+		// Encrypted should be different from original
+		if encrypted == token {
+			t.Error("Encrypted token should differ from original")
+		}
+
+		t.Logf("Original token length: %d, Encrypted length: %d", len(token), len(encrypted))
+
+		// Decrypt
+		decrypted, err := gen.DecryptFromStorage(encrypted)
+		if err != nil {
+			t.Fatalf("DecryptFromStorage failed: %v", err)
+		}
+
+		// Should match original
+		if decrypted != token {
+			t.Errorf("Decrypted token doesn't match original")
+		}
+
+		// Decrypted token should still verify
+		data, err := gen.Verify(decrypted)
+		if err != nil {
+			t.Fatalf("Verify decrypted token failed: %v", err)
+		}
+		if data.InviterEmail != "alice@example.com" {
+			t.Errorf("InviterEmail = %q, want alice@example.com", data.InviterEmail)
+		}
+	})
+
+	t.Run("different encryptions for same token", func(t *testing.T) {
+		// Each encryption should produce different ciphertext (due to random nonce)
+		enc1, _ := gen.EncryptForStorage(token)
+		enc2, _ := gen.EncryptForStorage(token)
+
+		if enc1 == enc2 {
+			t.Error("Same token encrypted twice should produce different ciphertexts")
+		}
+
+		// But both should decrypt to the same value
+		dec1, _ := gen.DecryptFromStorage(enc1)
+		dec2, _ := gen.DecryptFromStorage(enc2)
+
+		if dec1 != dec2 {
+			t.Error("Different encryptions of same token should decrypt to same value")
+		}
+	})
+
+	t.Run("tampered ciphertext rejected", func(t *testing.T) {
+		encrypted, _ := gen.EncryptForStorage(token)
+
+		// Tamper with the ciphertext
+		tampered := []byte(encrypted)
+		if len(tampered) > 10 {
+			tampered[10] ^= 0xFF
+		}
+
+		_, err := gen.DecryptFromStorage(string(tampered))
+		if err == nil {
+			t.Error("Expected error for tampered ciphertext")
+		}
+	})
+
+	t.Run("wrong key rejected", func(t *testing.T) {
+		// Encrypt with original key
+		encrypted, _ := gen.EncryptForStorage(token)
+
+		// Create generator with different key
+		otherKey := make([]byte, 32)
+		for i := range otherKey {
+			otherKey[i] = byte(i + 100)
+		}
+		otherGen, _ := NewInviteTokenGenerator(otherKey, 24*time.Hour)
+
+		// Decryption with wrong key should fail
+		_, err := otherGen.DecryptFromStorage(encrypted)
+		if err == nil {
+			t.Error("Expected error when decrypting with wrong key")
+		}
+	})
+}

@@ -25,8 +25,9 @@ type InviteTokenData struct {
 
 // InviteTokenGenerator creates and verifies cryptographic invite tokens.
 type InviteTokenGenerator struct {
-	key []byte
-	ttl time.Duration
+	key       []byte
+	ttl       time.Duration
+	encryptor *Encryptor // For encrypting tokens before DB storage
 }
 
 // NewInviteTokenGenerator creates a new invite token generator.
@@ -36,7 +37,14 @@ func NewInviteTokenGenerator(key []byte, ttl time.Duration) (*InviteTokenGenerat
 	if len(key) < 32 {
 		return nil, ErrInviteKeyTooShort
 	}
-	return &InviteTokenGenerator{key: key, ttl: ttl}, nil
+
+	// Create encryptor for DB storage encryption using the same key
+	encryptor, err := NewEncryptor(key[:32])
+	if err != nil {
+		return nil, err
+	}
+
+	return &InviteTokenGenerator{key: key, ttl: ttl, encryptor: encryptor}, nil
 }
 
 // Generate creates a compact cryptographic invite token.
@@ -174,4 +182,17 @@ func (g *InviteTokenGenerator) ShortCode(token string) string {
 	}
 
 	return encoded
+}
+
+// EncryptForStorage encrypts a token for secure database storage.
+// This prevents exposure of embedded emails if the database is compromised.
+// Returns a base64-encoded encrypted token.
+func (g *InviteTokenGenerator) EncryptForStorage(token string) (string, error) {
+	return g.encryptor.EncryptString(token)
+}
+
+// DecryptFromStorage decrypts a token retrieved from the database.
+// Returns the original token that can be verified with Verify().
+func (g *InviteTokenGenerator) DecryptFromStorage(encryptedToken string) (string, error) {
+	return g.encryptor.DecryptString(encryptedToken)
 }
