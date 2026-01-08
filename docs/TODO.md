@@ -1,8 +1,8 @@
-# Invite Code Flow
+# mvChat2 TODO & Design
 
 ## Overview
 
-mvChat2 uses invite codes to connect users. This document describes the complete flow for invite-based user onboarding.
+mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised as a pregnancy tracker. This document covers the invite flow, security architecture, and pending features.
 
 ## Scenarios
 
