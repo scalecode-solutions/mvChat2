@@ -32,7 +32,7 @@ redis:
 email:
   enabled: ${EMAIL_ENABLED:false}
   host: ${EMAIL_HOST:mail5010.site4now.net}
-  port: ${EMAIL_PORT:587}
+  port: ${EMAIL_PORT:465}
   username: ${EMAIL_USERNAME:noreply@mvchat.app}
   password: ${EMAIL_PASSWORD:}
   from: ${EMAIL_FROM:noreply@mvchat.app}

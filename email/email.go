@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"net/smtp"
@@ -72,12 +73,60 @@ func (s *Service) send(to, subject, body string) error {
 
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
+	// Use TLS for port 465, STARTTLS for 587
+	if s.cfg.Port == 465 {
+		return s.sendSSL(addr, to, msg)
+	}
+
 	var auth smtp.Auth
 	if s.cfg.Username != "" {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 	}
 
 	return smtp.SendMail(addr, auth, s.cfg.From, []string{to}, []byte(msg))
+}
+
+func (s *Service) sendSSL(addr, to, msg string) error {
+	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.cfg.Host})
+	if err != nil {
+		return fmt.Errorf("tls dial: %w", err)
+	}
+	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, s.cfg.Host)
+	if err != nil {
+		return fmt.Errorf("smtp client: %w", err)
+	}
+	defer client.Close()
+
+	if s.cfg.Username != "" {
+		auth := smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("auth: %w", err)
+		}
+	}
+
+	if err := client.Mail(s.cfg.From); err != nil {
+		return fmt.Errorf("mail: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("rcpt: %w", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("data: %w", err)
+	}
+	_, err = w.Write([]byte(msg))
+	if err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+	err = w.Close()
+	if err != nil {
+		return fmt.Errorf("close: %w", err)
+	}
+
+	return client.Quit()
 }
 
 func (s *Service) renderTemplate(tmpl string, data any) (string, error) {
