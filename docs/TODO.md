@@ -192,6 +192,13 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Room deletion/archival (owner can archive, data persists for evidence)
 - [ ] Room cleanup policy (configurable TTL for inactive rooms, or keep forever)
 
+### SDKs
+- [ ] React Native SDK (for Clingy and future mobile apps)
+- [ ] TypeScript/JavaScript SDK (for web clients)
+- [ ] Swift SDK (native iOS)
+- [ ] Kotlin SDK (native Android)
+- [ ] SDK documentation and examples
+
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface
 - [ ] Invite code redemption page
