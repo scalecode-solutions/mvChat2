@@ -100,7 +100,7 @@ func (s *Service) sendSSL(addr, to, msg string) error {
 	defer client.Close()
 
 	if s.cfg.Username != "" {
-		auth := smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
+		auth := LoginAuth(s.cfg.Username, s.cfg.Password)
 		if err := client.Auth(auth); err != nil {
 			return fmt.Errorf("auth: %w", err)
 		}
@@ -127,6 +127,34 @@ func (s *Service) sendSSL(addr, to, msg string) error {
 	}
 
 	return client.Quit()
+}
+
+// loginAuth implements smtp.Auth for LOGIN authentication.
+type loginAuth struct {
+	username, password string
+}
+
+// LoginAuth returns an Auth that implements the LOGIN authentication mechanism.
+func LoginAuth(username, password string) smtp.Auth {
+	return &loginAuth{username, password}
+}
+
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", nil, nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+	switch string(fromServer) {
+	case "Username:":
+		return []byte(a.username), nil
+	case "Password:":
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("unknown server challenge: %s", fromServer)
+	}
 }
 
 func (s *Service) renderTemplate(tmpl string, data any) (string, error) {
