@@ -58,7 +58,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sess := NewSession(s.hub, conn, remoteAddr, s.handlers)
+	sess := NewSession(s.hub, conn, remoteAddr, s.handlers, s.config.Limits.RateLimitMessages)
 	s.hub.Register(sess)
 
 	// Run the session (blocks until session closes)

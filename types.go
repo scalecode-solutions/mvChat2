@@ -269,17 +269,18 @@ func CtrlError(id string, code int, text string) *ServerMessage {
 
 // Common error codes
 const (
-	CodeOK            = 200
-	CodeCreated       = 201
-	CodeAccepted      = 202
-	CodeNoContent     = 204
-	CodeBadRequest    = 400
-	CodeUnauthorized  = 401
-	CodeForbidden     = 403
-	CodeNotFound      = 404
-	CodeConflict      = 409
-	CodeGone          = 410
-	CodeInternalError = 500
+	CodeOK              = 200
+	CodeCreated         = 201
+	CodeAccepted        = 202
+	CodeNoContent       = 204
+	CodeBadRequest      = 400
+	CodeUnauthorized    = 401
+	CodeForbidden       = 403
+	CodeNotFound        = 404
+	CodeConflict        = 409
+	CodeGone            = 410
+	CodeTooManyRequests = 429
+	CodeInternalError   = 500
 )
 
 // ============================================================================

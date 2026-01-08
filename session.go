@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/scalecode-solutions/mvchat2/ratelimit"
 )
 
 const (
@@ -33,6 +34,9 @@ type Session struct {
 	handlers   *Handlers
 	remoteAddr string
 
+	// Rate limiter for messages (per session)
+	rateLimiter *ratelimit.Limiter
+
 	// Protected by mu - accessed from multiple goroutines
 	mu        sync.RWMutex
 	userID    uuid.UUID
@@ -50,15 +54,16 @@ type Session struct {
 }
 
 // NewSession creates a new session.
-func NewSession(hub *Hub, conn *websocket.Conn, remoteAddr string, handlers *Handlers) *Session {
+func NewSession(hub *Hub, conn *websocket.Conn, remoteAddr string, handlers *Handlers, msgRateLimit int) *Session {
 	return &Session{
-		id:         uuid.New().String(),
-		hub:        hub,
-		conn:       conn,
-		send:       make(chan *ServerMessage, sendBufferSize),
-		handlers:   handlers,
-		remoteAddr: remoteAddr,
-		lastAction: time.Now().UnixNano(),
+		id:          uuid.New().String(),
+		hub:         hub,
+		conn:        conn,
+		send:        make(chan *ServerMessage, sendBufferSize),
+		handlers:    handlers,
+		remoteAddr:  remoteAddr,
+		rateLimiter: ratelimit.New(msgRateLimit, time.Second),
+		lastAction:  time.Now().UnixNano(),
 	}
 }
 
@@ -181,6 +186,12 @@ func (s *Session) readPump() {
 		}
 
 		atomic.StoreInt64(&s.lastAction, time.Now().UnixNano())
+
+		// Rate limit check
+		if !s.rateLimiter.Allow(s.id) {
+			s.Send(CtrlError("", CodeTooManyRequests, "rate limited"))
+			continue
+		}
 
 		var msg ClientMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
