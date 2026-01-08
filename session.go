@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -135,6 +136,7 @@ func (s *Session) Send(msg *ServerMessage) {
 	case s.send <- msg:
 	default:
 		// Buffer full, close the session
+		log.Printf("session %s: send buffer full, closing connection", s.id)
 		go s.Close() // Close in goroutine to avoid deadlock
 	}
 }

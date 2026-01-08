@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -86,11 +87,13 @@ type PubSubPayload struct {
 func (h *Hub) HandlePubSubMessage(msg *redis.Message) {
 	var payload PubSubPayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		log.Printf("hub: failed to unmarshal pub/sub message: %v", err)
 		return
 	}
 
 	userID, err := uuid.Parse(payload.UserID)
 	if err != nil {
+		log.Printf("hub: invalid user ID in pub/sub message: %v", err)
 		return
 	}
 
@@ -240,13 +243,19 @@ func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession s
 		for _, userID := range userIDs {
 			if !localUsers[userID] {
 				// Check if user is online on another node
-				online, _ := h.redis.IsOnline(ctx, userID.String())
+				online, err := h.redis.IsOnline(ctx, userID.String())
+				if err != nil {
+					log.Printf("hub: failed to check online status for user %s: %v", userID, err)
+					continue
+				}
 				if online {
 					payload := PubSubPayload{
 						UserID:  userID.String(),
 						Message: msg,
 					}
-					h.redis.Publish(ctx, "user:"+userID.String(), "data", payload)
+					if err := h.redis.Publish(ctx, "user:"+userID.String(), "data", payload); err != nil {
+						log.Printf("hub: failed to publish to user %s: %v", userID, err)
+					}
 				}
 			}
 		}

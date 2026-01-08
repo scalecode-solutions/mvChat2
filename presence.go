@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -159,7 +160,11 @@ func (p *PresenceManager) IsOnline(ctx context.Context, userID uuid.UUID) bool {
 
 	// Check Redis if enabled (user might be on another node)
 	if p.redis != nil {
-		online, _ := p.redis.IsOnline(ctx, userID.String())
+		online, err := p.redis.IsOnline(ctx, userID.String())
+		if err != nil {
+			log.Printf("presence: failed to check online status for user %s: %v", userID, err)
+			return false
+		}
 		return online
 	}
 
