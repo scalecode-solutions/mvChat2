@@ -271,3 +271,28 @@ CREATE TABLE invite_codes (
 CREATE INDEX idx_invite_codes_inviter ON invite_codes(inviter_id);
 CREATE INDEX idx_invite_codes_code ON invite_codes(code) WHERE status = 'pending';
 CREATE INDEX idx_invite_codes_email ON invite_codes(email);
+
+-- ============================================================================
+-- CONTACTS (User relationships from invites)
+-- ============================================================================
+
+CREATE TABLE contacts (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- How the contact was established
+    source VARCHAR(16) NOT NULL DEFAULT 'invite', -- 'invite', 'manual'
+    
+    -- Optional nickname for this contact
+    nickname VARCHAR(64),
+    
+    -- Reference to the invite that created this contact (if source='invite')
+    invite_id UUID REFERENCES invite_codes(id) ON DELETE SET NULL,
+    
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    PRIMARY KEY (user_id, contact_id)
+);
+
+CREATE INDEX idx_contacts_user ON contacts(user_id);
+CREATE INDEX idx_contacts_contact ON contacts(contact_id);

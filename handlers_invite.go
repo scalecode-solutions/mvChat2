@@ -148,9 +148,10 @@ func (h *Handlers) handleRevokeInvite(ctx context.Context, s *Session, msg *Clie
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 }
 
-// HandleRedeemInvite processes invite code redemption (signup via invite).
+// RedeemInviteCode processes invite code redemption (signup via invite).
 // This is called during account creation when an invite code is provided.
-func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID uuid.UUID) (*uuid.UUID, error) {
+// It also auto-redeems any other pending invites to the same email.
+func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID uuid.UUID) ([]uuid.UUID, error) {
 	// Use the invite code
 	invite, err := h.db.UseInviteCode(ctx, code, newUserID)
 	if err != nil {
@@ -160,12 +161,40 @@ func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID 
 		return nil, nil // Code not found or expired
 	}
 
-	// Create DM between inviter and new user
+	var connectedUsers []uuid.UUID
+
+	// Create DM and contact with the inviter
 	_, _, err = h.db.CreateDM(ctx, invite.InviterID, newUserID)
-	if err != nil {
-		// Log but don't fail - user is created, DM can be created later
-		return &invite.InviterID, nil
+	if err == nil {
+		h.db.AddContact(ctx, invite.InviterID, newUserID, "invite", &invite.ID)
+		connectedUsers = append(connectedUsers, invite.InviterID)
 	}
 
-	return &invite.InviterID, nil
+	// Check for other pending invites to the same email
+	otherInvites, err := h.db.GetPendingInvitesByEmail(ctx, invite.Email)
+	if err != nil {
+		return connectedUsers, nil // Don't fail, just return what we have
+	}
+
+	for _, other := range otherInvites {
+		// Skip the one we just used
+		if other.ID == invite.ID {
+			continue
+		}
+
+		// Mark as used
+		_, err := h.db.UseInviteCode(ctx, other.Code, newUserID)
+		if err != nil {
+			continue
+		}
+
+		// Create DM and contact with this inviter too
+		_, _, err = h.db.CreateDM(ctx, other.InviterID, newUserID)
+		if err == nil {
+			h.db.AddContact(ctx, other.InviterID, newUserID, "invite", &other.ID)
+			connectedUsers = append(connectedUsers, other.InviterID)
+		}
+	}
+
+	return connectedUsers, nil
 }

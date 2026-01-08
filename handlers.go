@@ -243,16 +243,15 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		return
 	}
 
-	// If invite code provided, redeem it (creates DM with inviter)
-	var inviterID *string
+	// If invite code provided, redeem it (creates DMs and contacts with inviters)
+	var connectedInviters []string
 	if acc.InviteCode != "" {
-		inviter, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID)
+		inviters, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID)
 		if err != nil {
 			// Log but don't fail account creation
 		}
-		if inviter != nil {
-			id := inviter.String()
-			inviterID = &id
+		for _, inv := range inviters {
+			connectedInviters = append(connectedInviters, inv.String())
 		}
 	}
 
@@ -274,8 +273,8 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 				"public": public,
 			},
 		}
-		if inviterID != nil {
-			params["inviter"] = *inviterID
+		if len(connectedInviters) > 0 {
+			params["inviters"] = connectedInviters
 		}
 		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	} else {
@@ -285,8 +284,8 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 				"public": public,
 			},
 		}
-		if inviterID != nil {
-			params["inviter"] = *inviterID
+		if len(connectedInviters) > 0 {
+			params["inviters"] = connectedInviters
 		}
 		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	}

@@ -196,9 +196,46 @@ func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
 		h.handleGetMembers(ctx, s, msg, get)
 	case "receipts":
 		h.handleGetReceipts(ctx, s, msg, get)
+	case "contacts":
+		h.handleGetContacts(ctx, s, msg)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown what"))
 	}
+}
+
+func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *ClientMessage) {
+	contacts, err := h.db.GetContacts(ctx, s.userID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get contacts"))
+		return
+	}
+
+	results := make([]map[string]any, 0, len(contacts))
+	for _, c := range contacts {
+		// Get contact's user info
+		user, _ := h.db.GetUserByID(ctx, c.ContactID)
+
+		item := map[string]any{
+			"user":      c.ContactID.String(),
+			"source":    c.Source,
+			"createdAt": c.CreatedAt,
+		}
+		if c.Nickname != nil {
+			item["nickname"] = *c.Nickname
+		}
+		if user != nil {
+			item["public"] = user.Public
+			item["online"] = h.hub.IsOnline(c.ContactID)
+			if user.LastSeen != nil {
+				item["lastSeen"] = user.LastSeen
+			}
+		}
+		results = append(results, item)
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"contacts": results,
+	}))
 }
 
 func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *ClientMessage) {
