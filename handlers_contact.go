@@ -8,8 +8,7 @@ import (
 
 // HandleContact processes contact management requests.
 func (h *Handlers) HandleContact(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 

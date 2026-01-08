@@ -94,6 +94,21 @@ func (s *Session) IsAuthenticated() bool {
 	return s.userID != uuid.Nil
 }
 
+// RequireAuth checks if the session is authenticated and sends an error if not.
+// Returns true if authenticated, false otherwise.
+// Use this at the start of handlers that require authentication:
+//
+//	if !s.RequireAuth(msg.ID) {
+//	    return
+//	}
+func (s *Session) RequireAuth(msgID string) bool {
+	if s.IsAuthenticated() {
+		return true
+	}
+	s.Send(CtrlError(msgID, CodeUnauthorized, "authentication required"))
+	return false
+}
+
 // UserAgent returns the session's user agent.
 func (s *Session) UserAgent() string {
 	s.mu.RLock()

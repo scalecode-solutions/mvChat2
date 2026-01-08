@@ -292,8 +292,7 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 }
 
 func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *ClientMessage, acc *MsgClientAcc) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -363,8 +362,7 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 
 // HandleSearch processes user search requests.
 func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 

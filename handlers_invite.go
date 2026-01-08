@@ -12,8 +12,7 @@ import (
 
 // HandleInvite processes invite code requests.
 func (h *Handlers) HandleInvite(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 

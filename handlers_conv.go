@@ -10,8 +10,7 @@ import (
 
 // HandleDM processes DM requests (start DM, manage settings).
 func (h *Handlers) HandleDM(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -132,8 +131,7 @@ func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMe
 
 // HandleRoom processes room requests.
 func (h *Handlers) HandleRoom(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -174,8 +172,7 @@ func (h *Handlers) handleCreateRoom(ctx context.Context, s *Session, msg *Client
 
 // HandleGet processes get requests (conversations, messages, members).
 func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -427,8 +424,7 @@ func (h *Handlers) handleGetReceipts(ctx context.Context, s *Session, msg *Clien
 
 // HandleSend processes send message requests.
 func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -524,8 +520,7 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 
 // HandleEdit processes edit message requests.
 func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -609,8 +604,7 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 
 // HandleUnsend processes unsend message requests.
 func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -675,8 +669,7 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 
 // HandleDelete processes delete message requests (for me or for everyone).
 func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -743,8 +736,7 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 
 // HandleReact processes reaction requests.
 func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -798,8 +790,7 @@ func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
 
 // HandleTyping processes typing indicator requests.
 func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
@@ -838,8 +829,7 @@ func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
 
 // HandleRead processes read receipt requests.
 func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
-	if !s.IsAuthenticated() {
-		s.Send(CtrlError(msg.ID, CodeUnauthorized, "authentication required"))
+	if !s.RequireAuth(msg.ID) {
 		return
 	}
 
