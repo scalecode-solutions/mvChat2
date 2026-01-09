@@ -11,6 +11,10 @@ import (
 
 // HandleDM processes DM requests (start DM, manage settings).
 func (h *Handlers) HandleDM(s *Session, msg *ClientMessage) {
+	h.handleDM(s, msg)
+}
+
+func (h *Handlers) handleDM(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -39,7 +43,7 @@ func (h *Handlers) HandleDM(s *Session, msg *ClientMessage) {
 	s.Send(CtrlError(msg.ID, CodeBadRequest, "missing user or conv"))
 }
 
-func (h *Handlers) handleStartDM(ctx context.Context, s *Session, msg *ClientMessage, dm *MsgClientDM) {
+func (h *Handlers) handleStartDM(ctx context.Context, s SessionInterface, msg *ClientMessage, dm *MsgClientDM) {
 	otherUserID, ok := parseUUID(s, msg.ID, dm.User, "user id")
 	if !ok {
 		return
@@ -79,12 +83,12 @@ func (h *Handlers) handleStartDM(ctx context.Context, s *Session, msg *ClientMes
 		"user": map[string]any{
 			"id":     otherUser.ID.String(),
 			"public": otherUser.Public,
-			"online": h.hub.IsOnline(otherUser.ID),
+			"online": h.isOnline(otherUser.ID),
 		},
 	}))
 }
 
-func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMessage, dm *MsgClientDM) {
+func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *ClientMessage, dm *MsgClientDM) {
 	convID, ok := parseUUID(s, msg.ID, dm.ConversationID, "conv id")
 	if !ok {
 		return
@@ -118,6 +122,10 @@ func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMe
 
 // HandleRoom processes room requests.
 func (h *Handlers) HandleRoom(s *Session, msg *ClientMessage) {
+	h.handleRoom(s, msg)
+}
+
+func (h *Handlers) handleRoom(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -140,7 +148,7 @@ func (h *Handlers) HandleRoom(s *Session, msg *ClientMessage) {
 	}
 }
 
-func (h *Handlers) handleCreateRoom(ctx context.Context, s *Session, msg *ClientMessage, room *MsgClientRoom) {
+func (h *Handlers) handleCreateRoom(ctx context.Context, s SessionInterface, msg *ClientMessage, room *MsgClientRoom) {
 	var public json.RawMessage
 	if room.Desc != nil {
 		public = room.Desc.Public
@@ -160,6 +168,10 @@ func (h *Handlers) handleCreateRoom(ctx context.Context, s *Session, msg *Client
 
 // HandleGet processes get requests (conversations, messages, members).
 func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
+	h.handleGet(s, msg)
+}
+
+func (h *Handlers) handleGet(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -189,7 +201,7 @@ func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
 	}
 }
 
-func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *ClientMessage) {
+func (h *Handlers) handleGetContacts(ctx context.Context, s SessionInterface, msg *ClientMessage) {
 	contacts, err := h.db.GetContacts(ctx, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get contacts"))
@@ -211,7 +223,7 @@ func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *Clien
 		}
 		if user != nil {
 			item["public"] = user.Public
-			item["online"] = h.hub.IsOnline(c.ContactID)
+			item["online"] = h.isOnline(c.ContactID)
 			if user.LastSeen != nil {
 				item["lastSeen"] = user.LastSeen
 			}
@@ -224,7 +236,7 @@ func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *Clien
 	}))
 }
 
-func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *ClientMessage) {
+func (h *Handlers) handleGetConversations(ctx context.Context, s SessionInterface, msg *ClientMessage) {
 	convs, err := h.db.GetUserConversations(ctx, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get conversations"))
@@ -249,7 +261,7 @@ func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *
 			item["user"] = map[string]any{
 				"id":       c.OtherUser.ID.String(),
 				"public":   c.OtherUser.Public,
-				"online":   h.hub.IsOnline(c.OtherUser.ID),
+				"online":   h.isOnline(c.OtherUser.ID),
 				"lastSeen": c.OtherUser.LastSeen,
 			}
 		} else if c.Type == "room" {
@@ -263,7 +275,7 @@ func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *
 	}))
 }
 
-func (h *Handlers) handleGetMessages(ctx context.Context, s *Session, msg *ClientMessage, get *MsgClientGet) {
+func (h *Handlers) handleGetMessages(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
 	if get.ConversationID == "" {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing conv"))
 		return
@@ -320,7 +332,7 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s *Session, msg *Clien
 	}))
 }
 
-func (h *Handlers) handleGetMembers(ctx context.Context, s *Session, msg *ClientMessage, get *MsgClientGet) {
+func (h *Handlers) handleGetMembers(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
 	if get.ConversationID == "" {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing conv"))
 		return
@@ -348,7 +360,7 @@ func (h *Handlers) handleGetMembers(ctx context.Context, s *Session, msg *Client
 			results = append(results, map[string]any{
 				"id":       user.ID.String(),
 				"public":   user.Public,
-				"online":   h.hub.IsOnline(user.ID),
+				"online":   h.isOnline(user.ID),
 				"lastSeen": user.LastSeen,
 			})
 		}
@@ -359,7 +371,7 @@ func (h *Handlers) handleGetMembers(ctx context.Context, s *Session, msg *Client
 	}))
 }
 
-func (h *Handlers) handleGetReceipts(ctx context.Context, s *Session, msg *ClientMessage, get *MsgClientGet) {
+func (h *Handlers) handleGetReceipts(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
 	if get.ConversationID == "" {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing conv"))
 		return
@@ -396,6 +408,10 @@ func (h *Handlers) handleGetReceipts(ctx context.Context, s *Session, msg *Clien
 
 // HandleSend processes send message requests.
 func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
+	h.handleSend(s, msg)
+}
+
+func (h *Handlers) handleSend(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -487,11 +503,17 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 			Ts:             message.CreatedAt,
 		},
 	}
-	h.hub.SendToUsers(memberIDs, dataMsg, s.id)
+	if h.hub != nil {
+		h.hub.SendToUsers(memberIDs, dataMsg, s.ID())
+	}
 }
 
 // HandleEdit processes edit message requests.
 func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
+	h.handleEdit(s, msg)
+}
+
+func (h *Handlers) handleEdit(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -567,11 +589,15 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 		Seq:            edit.Seq,
 		Content:        edit.Content,
 		Ts:             now,
-	}, s.id)
+	}, s.ID())
 }
 
 // HandleUnsend processes unsend message requests.
 func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
+	h.handleUnsend(s, msg)
+}
+
+func (h *Handlers) handleUnsend(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -627,11 +653,15 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 		What:           "unsend",
 		Seq:            unsend.Seq,
 		Ts:             time.Now().UTC(),
-	}, s.id)
+	}, s.ID())
 }
 
 // HandleDelete processes delete message requests (for me or for everyone).
 func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
+	h.handleDelete(s, msg)
+}
+
+func (h *Handlers) handleDelete(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -682,7 +712,7 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 			What:           "delete",
 			Seq:            del.Seq,
 			Ts:             time.Now().UTC(),
-		}, s.id)
+		}, s.ID())
 	} else {
 		// Delete for me only
 		if err := h.db.DeleteMessageForUser(ctx, origMsg.ID, s.UserID()); err != nil {
@@ -695,6 +725,10 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 
 // HandleReact processes reaction requests.
 func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
+	h.handleReact(s, msg)
+}
+
+func (h *Handlers) handleReact(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -732,11 +766,15 @@ func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
 		Seq:            react.Seq,
 		Emoji:          react.Emoji,
 		Ts:             time.Now().UTC(),
-	}, s.id)
+	}, s.ID())
 }
 
 // HandleTyping processes typing indicator requests.
 func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
+	h.handleTyping(s, msg)
+}
+
+func (h *Handlers) handleTyping(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -767,11 +805,15 @@ func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
 		From:           s.UserID().String(),
 		What:           "typing",
 		Ts:             time.Now().UTC(),
-	}, s.id)
+	}, s.ID())
 }
 
 // HandleRead processes read receipt requests.
 func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
+	h.handleRead(s, msg)
+}
+
+func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -805,5 +847,5 @@ func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
 		What:           "read",
 		Seq:            read.Seq,
 		Ts:             time.Now().UTC(),
-	}, s.id)
+	}, s.ID())
 }

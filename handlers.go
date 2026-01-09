@@ -26,7 +26,7 @@ func handlerCtx() (context.Context, context.CancelFunc) {
 
 // parseUUID parses a UUID string and sends an error response if invalid.
 // Returns the parsed UUID and true on success, or uuid.Nil and false on failure.
-func parseUUID(s *Session, msgID, uuidStr, field string) (uuid.UUID, bool) {
+func parseUUID(s SessionInterface, msgID, uuidStr, field string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(uuidStr)
 	if err != nil {
 		s.Send(CtrlError(msgID, CodeBadRequest, "invalid "+field))
@@ -53,7 +53,7 @@ func decodeCredentials(s SessionInterface, msgID, secret string) (username, pass
 
 // requireMember checks if the user is a member of the conversation.
 // Returns true if member, false otherwise (after sending error response).
-func (h *Handlers) requireMember(ctx context.Context, s *Session, msgID string, convID uuid.UUID) bool {
+func (h *Handlers) requireMember(ctx context.Context, s SessionInterface, msgID string, convID uuid.UUID) bool {
 	isMember, err := h.db.IsMember(ctx, convID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msgID, CodeInternalError, "database error"))
@@ -68,8 +68,19 @@ func (h *Handlers) requireMember(ctx context.Context, s *Session, msgID string, 
 
 // broadcastToConv sends an Info message to all members of a conversation.
 func (h *Handlers) broadcastToConv(ctx context.Context, convID uuid.UUID, info *MsgServerInfo, skipSession string) {
+	if h.hub == nil {
+		return
+	}
 	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
 	h.hub.SendToUsers(memberIDs, &ServerMessage{Info: info}, skipSession)
+}
+
+// isOnline safely checks if a user is online (handles nil hub for testing).
+func (h *Handlers) isOnline(userID uuid.UUID) bool {
+	if h.hub == nil {
+		return false
+	}
+	return h.hub.IsOnline(userID)
 }
 
 // Handlers holds dependencies for request handlers.
