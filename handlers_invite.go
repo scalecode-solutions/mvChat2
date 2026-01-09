@@ -109,9 +109,9 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 	if h.email != nil && h.email.IsEnabled() {
 		go func() {
 			if err := h.email.SendInvite(inviteeEmail, toName, shortCode, inviterName); err != nil {
-				log.Printf("invite: failed to send email to %s: %v", inviteeEmail, err)
+				log.Printf("invite: failed to send email to %s: %v", maskEmail(inviteeEmail), err)
 			} else {
-				log.Printf("invite: email sent to %s", inviteeEmail)
+				log.Printf("invite: email sent to %s", maskEmail(inviteeEmail))
 			}
 		}()
 	}
@@ -231,8 +231,8 @@ func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, m
 	}
 
 	// Add as contacts
-	if err := h.db.AddContact(ctx, invite.InviterID, s.userID, "invite", &invite.ID); err != nil {
-		log.Printf("invite: failed to add contact between %s and %s: %v", invite.InviterID, s.userID, err)
+	if err := h.db.AddContact(ctx, invite.InviterID, s.UserID(), "invite", &invite.ID); err != nil {
+		log.Printf("invite: failed to add contact between %s and %s: %v", shortID(invite.InviterID), shortID(s.UserID()), err)
 	}
 
 	// Get inviter info
@@ -284,7 +284,7 @@ func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID 
 	_, _, err = h.db.CreateDM(ctx, invite.InviterID, newUserID)
 	if err == nil {
 		if err := h.db.AddContact(ctx, invite.InviterID, newUserID, "invite", &invite.ID); err != nil {
-			log.Printf("invite: failed to add contact between %s and %s: %v", invite.InviterID, newUserID, err)
+			log.Printf("invite: failed to add contact between %s and %s: %v", shortID(invite.InviterID), shortID(newUserID), err)
 		}
 		connectedUsers = append(connectedUsers, invite.InviterID)
 	}
@@ -311,7 +311,7 @@ func (h *Handlers) RedeemInviteCode(ctx context.Context, code string, newUserID 
 		_, _, err = h.db.CreateDM(ctx, other.InviterID, newUserID)
 		if err == nil {
 			if err := h.db.AddContact(ctx, other.InviterID, newUserID, "invite", &other.ID); err != nil {
-				log.Printf("invite: failed to add contact between %s and %s: %v", other.InviterID, newUserID, err)
+				log.Printf("invite: failed to add contact between %s and %s: %v", shortID(other.InviterID), shortID(newUserID), err)
 			}
 			connectedUsers = append(connectedUsers, other.InviterID)
 		}

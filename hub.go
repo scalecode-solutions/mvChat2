@@ -269,7 +269,7 @@ func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession s
 				// Check if user is online on another node
 				online, err := h.redis.IsOnline(ctx, userID.String())
 				if err != nil {
-					log.Printf("hub: failed to check online status for user %s: %v", userID, err)
+					log.Printf("hub: failed to check online status for user %s: %v", shortID(userID), err)
 					continue
 				}
 				if online {
@@ -278,7 +278,7 @@ func (h *Hub) SendToUsers(userIDs []uuid.UUID, msg *ServerMessage, skipSession s
 						Message: msg,
 					}
 					if err := h.redis.Publish(ctx, "user:"+userID.String(), "data", payload); err != nil {
-						log.Printf("hub: failed to publish to user %s: %v", userID, err)
+						log.Printf("hub: failed to publish to user %s: %v", shortID(userID), err)
 					}
 				}
 			}

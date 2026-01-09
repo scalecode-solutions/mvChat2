@@ -91,6 +91,7 @@ Most critical and high-priority security issues have been resolved. The codebase
 | Redis errors silently ignored | FIXED | Added logging for SetOnline/SetOffline/RefreshOnline |
 | Security headers | FIXED | Handled by Caddy (see below) |
 | Reaction race condition | FIXED | SELECT FOR UPDATE in transaction for atomic JSONB update |
+| Sensitive data in logs | FIXED | Added maskEmail() and shortID() helpers, sanitized all log statements |
 
 ### Caddy Security Configuration
 
@@ -122,9 +123,7 @@ None - all high priority issues have been resolved.
 
 ### Medium Priority
 
-| Issue | File | Notes |
-|-------|------|-------|
-| Sensitive data in logs | various | PII in error messages |
+None - all medium priority issues have been resolved.
 
 ### Low Priority
 
