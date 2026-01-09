@@ -170,15 +170,23 @@ func (db *DB) DeleteMessageForUser(ctx context.Context, msgID, userID uuid.UUID)
 }
 
 // AddReaction adds or toggles a reaction on a message.
+// Uses SELECT FOR UPDATE to prevent race conditions when multiple users react simultaneously.
 func (db *DB) AddReaction(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error {
 	now := time.Now().UTC()
 	userIDStr := userID.String()
 
-	// Get current reactions
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock the row while we modify it to prevent race conditions
 	var head json.RawMessage
-	err := db.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(head, '{}'::jsonb) FROM messages
 		WHERE conversation_id = $1 AND seq = $2
+		FOR UPDATE
 	`, convID, seq).Scan(&head)
 	if err != nil {
 		return err
@@ -231,11 +239,15 @@ func (db *DB) AddReaction(ctx context.Context, convID uuid.UUID, seq int, userID
 		return err
 	}
 
-	_, err = db.pool.Exec(ctx, `
+	_, err = tx.Exec(ctx, `
 		UPDATE messages SET head = $3, updated_at = $4
 		WHERE conversation_id = $1 AND seq = $2
 	`, convID, seq, newHead, now)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetEditCount returns the edit count for a message.
