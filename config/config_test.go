@@ -247,3 +247,164 @@ database:
 		t.Errorf("expected token.key from env, got %q", cfg.Auth.Token.Key)
 	}
 }
+
+func TestDatabaseConfig_DSN(t *testing.T) {
+	cfg := DatabaseConfig{
+		Host:       "localhost",
+		Port:       5432,
+		Name:       "testdb",
+		User:       "testuser",
+		Password:   "testpass",
+		SSLMode:    "disable",
+		SQLTimeout: 10,
+	}
+
+	dsn := cfg.DSN()
+	expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&connect_timeout=10"
+	if dsn != expected {
+		t.Errorf("DSN() = %q, want %q", dsn, expected)
+	}
+}
+
+func TestLoad_FileNotFound(t *testing.T) {
+	_, err := Load("/nonexistent/path/config.yaml")
+	if err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+}
+
+func TestLoad_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "invalid.yaml")
+	// Invalid YAML - tabs mixed with spaces incorrectly
+	content := ":\n  bad yaml content [\n"
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	_, err := Load(configPath)
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestLoad_ValidationFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "test.yaml")
+	// Valid YAML but missing required fields - will fail validation
+	content := `
+auth:
+  api_key_salt: ""
+  token:
+    key: ""
+database:
+  uid_key: ""
+  encryption_key: ""
+`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	_, err := Load(configPath)
+	if err == nil {
+		t.Error("expected validation error")
+	}
+}
+
+func TestExpandEnvVars_WithDefault(t *testing.T) {
+	content := "${NONEXISTENT_VAR:defaultvalue}"
+	result := expandEnvVars(content)
+	if result != "defaultvalue" {
+		t.Errorf("expected 'defaultvalue', got %q", result)
+	}
+}
+
+func TestExpandEnvVars_ExistingVar(t *testing.T) {
+	os.Setenv("EXISTING_VAR", "actualvalue")
+	defer os.Unsetenv("EXISTING_VAR")
+
+	content := "${EXISTING_VAR:defaultvalue}"
+	result := expandEnvVars(content)
+	if result != "actualvalue" {
+		t.Errorf("expected 'actualvalue', got %q", result)
+	}
+}
+
+func TestExpandEnvVars_NoDefault(t *testing.T) {
+	// Variable not set and no default - should return empty string
+	content := "${NONEXISTENT_VAR_NO_DEFAULT}"
+	result := expandEnvVars(content)
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
+
+func TestValidate_NumericLimits(t *testing.T) {
+	baseConfig := func() Config {
+		return Config{
+			Auth: AuthConfig{
+				APIKeySalt: "uniqueSecureApiSaltGenerated1234",
+				Token:      TokenAuthConfig{Key: "uniqueSecureTokenKeyGenerated123"},
+				Basic:      BasicAuthConfig{MinLoginLength: 4, MinPasswordLength: 6},
+			},
+			Database: DatabaseConfig{
+				UIDKey:        "uniqueUIDKey1234",
+				EncryptionKey: "uniqueSecureEncryptionKey1234567",
+			},
+			Limits: LimitsConfig{
+				MaxMessageSize:     131072,
+				MaxSubscriberCount: 128,
+			},
+			Media: MediaConfig{
+				MaxSize: 8388608,
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		modify  func(*Config)
+		wantErr string
+	}{
+		{
+			name:    "min_login_length <= 0",
+			modify:  func(c *Config) { c.Auth.Basic.MinLoginLength = 0 },
+			wantErr: "auth.basic.min_login_length must be > 0",
+		},
+		{
+			name:    "min_password_length <= 0",
+			modify:  func(c *Config) { c.Auth.Basic.MinPasswordLength = 0 },
+			wantErr: "auth.basic.min_password_length must be > 0",
+		},
+		{
+			name:    "max_message_size <= 0",
+			modify:  func(c *Config) { c.Limits.MaxMessageSize = 0 },
+			wantErr: "limits.max_message_size must be > 0",
+		},
+		{
+			name:    "max_subscriber_count <= 0",
+			modify:  func(c *Config) { c.Limits.MaxSubscriberCount = 0 },
+			wantErr: "limits.max_subscriber_count must be > 0",
+		},
+		{
+			name:    "media.max_size <= 0",
+			modify:  func(c *Config) { c.Media.MaxSize = 0 },
+			wantErr: "media.max_size must be > 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := baseConfig()
+			tt.modify(&cfg)
+			err := cfg.validate()
+			if err == nil {
+				t.Errorf("expected error %q, got nil", tt.wantErr)
+				return
+			}
+			if err.Error() != tt.wantErr {
+				t.Errorf("expected error %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
