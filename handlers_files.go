@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -153,6 +154,7 @@ func (fh *FileHandlers) processMedia(fileID uuid.UUID, path, mimeType string) {
 	}
 
 	if err != nil {
+		slog.Error("media processing failed", "file_id", fileID, "path", path, "mime", mimeType, "error", err)
 		fh.db.UpdateFileStatus(ctx, fileID, "failed")
 		return
 	}
