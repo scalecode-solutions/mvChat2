@@ -154,6 +154,7 @@ func main() {
 		Password: cfg.Email.Password,
 		From:     cfg.Email.From,
 		FromName: cfg.Email.FromName,
+		BaseURL:  cfg.Email.BaseURL,
 	})
 
 	// Initialize invite token generator (uses token key, 7-day TTL)

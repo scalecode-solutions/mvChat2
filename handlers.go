@@ -368,7 +368,7 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 
 	// Update public data if provided
 	if acc.Desc != nil && acc.Desc.Public != nil {
-		if err := h.db.UpdateUserPublic(ctx, s.userID, acc.Desc.Public); err != nil {
+		if err := h.db.UpdateUserPublic(ctx, s.UserID(), acc.Desc.Public); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update profile"))
 			return
 		}
@@ -397,7 +397,7 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 
 		// Get current auth record
-		authRecord, err := h.db.GetAuthByUserID(ctx, s.userID)
+		authRecord, err := h.db.GetAuthByUserID(ctx, s.UserID())
 		if err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
 			return
@@ -421,20 +421,20 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 
 		// Update password
-		if err := h.db.UpdatePassword(ctx, s.userID, hashedPassword); err != nil {
+		if err := h.db.UpdatePassword(ctx, s.UserID(), hashedPassword); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update password"))
 			return
 		}
 
 		// Clear the must_change_password flag since user has now changed their password
-		if err := h.db.ClearMustChangePassword(ctx, s.userID); err != nil {
+		if err := h.db.ClearMustChangePassword(ctx, s.UserID()); err != nil {
 			// Log but don't fail - password was successfully changed
 		}
 	}
 
 	// Update email if provided
 	if acc.Email != nil {
-		if err := h.db.UpdateUserEmail(ctx, s.userID, acc.Email); err != nil {
+		if err := h.db.UpdateUserEmail(ctx, s.UserID(), acc.Email); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update email"))
 			return
 		}
@@ -467,7 +467,7 @@ func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
 	results := make([]map[string]any, 0, len(users))
 	for _, user := range users {
 		// Don't return self
-		if user.ID == s.userID {
+		if user.ID == s.UserID() {
 			continue
 		}
 		results = append(results, map[string]any{

@@ -130,6 +130,10 @@ type EmailConfig struct {
 	From     string `yaml:"from"`
 	FromName string `yaml:"from_name"`
 
+	// BaseURL is the base URL for email links (e.g., verification links).
+	// Example: "https://chat.mvchat.app"
+	BaseURL string `yaml:"base_url"`
+
 	// Verification settings
 	// IMPORTANT: For DV (domestic violence) apps, email verification should be DISABLED
 	// by default to prevent alerting abusers that the user has signed up for a messaging app.
@@ -300,6 +304,10 @@ func (c *Config) applyDefaults() {
 		c.Limits.RateLimitUpload = 10 // 10 uploads per minute
 	}
 
+	// Email defaults
+	if c.Email.BaseURL == "" {
+		c.Email.BaseURL = "https://chat.mvchat.app"
+	}
 	// Email verification defaults
 	// NOTE: Verification is DISABLED by default for user safety (DV context)
 	// c.Email.Verification.Enabled defaults to false (zero value)

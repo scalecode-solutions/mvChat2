@@ -21,6 +21,7 @@ type Config struct {
 	Password string `yaml:"password"`
 	From     string `yaml:"from"`
 	FromName string `yaml:"from_name"`
+	BaseURL  string `yaml:"base_url"` // Base URL for email links (e.g., verification)
 }
 
 // Service handles email sending.
@@ -51,10 +52,16 @@ func (s *Service) SendVerification(toEmail, token string) error {
 
 	subject := "Verify your email address"
 
+	// Build verification link using configured base URL
+	baseURL := s.cfg.BaseURL
+	if baseURL == "" {
+		baseURL = "https://chat.mvchat.app" // Fallback default
+	}
+
 	// The token is URL-safe base64, but we still escape it for safety
 	data := map[string]string{
 		"Token": html.EscapeString(token),
-		"Link":  fmt.Sprintf("https://chat.mvchat.app/verify-email?token=%s", token),
+		"Link":  fmt.Sprintf("%s/verify-email?token=%s", baseURL, token),
 	}
 
 	body, err := s.renderTemplate(verificationTemplate, data)
