@@ -9,6 +9,10 @@ export interface MVChat2ClientConfig {
   reconnectBackoff?: number;
   compression?: boolean;
   timeout?: number;
+  // Optional device/client info sent in handshake
+  deviceId?: string;
+  lang?: string;
+  userAgent?: string;
 }
 
 // User types
@@ -71,6 +75,8 @@ export interface Conversation {
   muted?: boolean;
   lastMsgAt?: string;
   public?: ConversationPublic;
+  // Private data for this conversation (only visible to you)
+  private?: any;
   // For DMs: the other user (backend returns as 'user')
   user?: {
     id: string;
@@ -387,6 +393,8 @@ export interface MsgClientDM {
   favorite?: boolean;
   muted?: boolean;
   blocked?: boolean;
+  // Private data for this conversation (only visible to you)
+  private?: any;
   // Disappearing messages TTL in seconds (0 to disable)
   disappearingTTL?: number;
 }

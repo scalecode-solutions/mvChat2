@@ -43,6 +43,10 @@ interface MVChat2ClientConfig {
   reconnectBackoff?: number;      // Backoff multiplier (default: 1.5)
   compression?: boolean;          // Enable compression (default: true)
   timeout?: number;               // Request timeout ms (default: 10000)
+  // Optional device/client info sent in handshake
+  deviceId?: string;              // Unique device identifier
+  lang?: string;                  // Language code (e.g., 'en', 'es')
+  userAgent?: string;             // Custom user agent string
 }
 ```
 
@@ -177,8 +181,11 @@ await client.updateDMSettings(convId, {
   favorite: true,
   muted: false,
   blocked: false,
+  private: { notes: 'My private notes about this conversation' },
 });
 ```
+
+The `private` field stores data only visible to you (not the other user).
 
 ### Get Members
 

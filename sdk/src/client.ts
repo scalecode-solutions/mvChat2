@@ -156,7 +156,9 @@ export class MVChat2Client {
     return this.request({
       hi: {
         ver: '0.1.0',
-        ua: 'MVChat2SDK/0.1.0',
+        ua: this.config.userAgent || 'MVChat2SDK/0.1.0',
+        dev: this.config.deviceId,
+        lang: this.config.lang,
       },
     });
   }
@@ -709,13 +711,14 @@ export class MVChat2Client {
   }
 
   // DM settings
-  async updateDMSettings(convId: string, options: { favorite?: boolean; muted?: boolean; blocked?: boolean }): Promise<void> {
+  async updateDMSettings(convId: string, options: { favorite?: boolean; muted?: boolean; blocked?: boolean; private?: any }): Promise<void> {
     await this.request({
       dm: {
         conv: convId,
         favorite: options.favorite,
         muted: options.muted,
         blocked: options.blocked,
+        private: options.private,
       },
     });
   }
