@@ -78,6 +78,12 @@ export interface Conversation {
     online: boolean;
     lastSeen?: string;
   };
+  // Disappearing messages TTL in seconds (undefined = disabled)
+  disappearingTTL?: number;
+  // Pinned message info
+  pinnedSeq?: number;
+  pinnedAt?: string;
+  pinnedBy?: string;
 }
 
 export interface ConversationPublic {
@@ -108,6 +114,8 @@ export interface Message {
   content?: Irido;
   head?: Record<string, any>;
   deleted?: boolean;
+  // View-once message indicator
+  viewOnce?: boolean;
 }
 
 export interface Irido {
@@ -147,6 +155,10 @@ export interface SendMessageOptions {
   media?: IridoMedia[];
   replyTo?: number;
   mentions?: IridoMention[];
+  // View-once message (disappears after recipient views)
+  viewOnce?: boolean;
+  // View-once TTL in seconds: 10, 30, 60, 300, 3600, 86400, 604800
+  viewOnceTTL?: number;
 }
 
 // Contact types
@@ -235,6 +247,22 @@ export interface ReadEvent {
   seq: number;
 }
 
+export interface PinEvent {
+  conv: string;
+  from: string;
+  seq: number;
+}
+
+export interface UnpinEvent {
+  conv: string;
+  from: string;
+}
+
+export interface DisappearingUpdatedEvent {
+  conv: string;
+  from: string;
+}
+
 // Wire protocol types
 export interface ClientMessage {
   id?: string;
@@ -254,6 +282,7 @@ export interface ClientMessage {
   read?: MsgClientRead;
   invite?: MsgClientInvite;
   contact?: MsgClientContact;
+  pin?: MsgClientPin;
 }
 
 export interface MsgClientHi {
@@ -289,6 +318,8 @@ export interface MsgClientDM {
   favorite?: boolean;
   muted?: boolean;
   blocked?: boolean;
+  // Disappearing messages TTL in seconds (0 to disable)
+  disappearingTTL?: number;
 }
 
 export interface MsgClientRoom {
@@ -296,12 +327,17 @@ export interface MsgClientRoom {
   action?: 'create' | 'join' | 'leave' | 'invite' | 'kick' | 'update';
   user?: string;
   desc?: { public?: any };
+  // Disappearing messages TTL in seconds (0 to disable)
+  disappearingTTL?: number;
 }
 
 export interface MsgClientSend {
   conv: string;
   content: any;
   replyTo?: number;
+  // View-once message
+  viewOnce?: boolean;
+  viewOnceTTL?: number;
 }
 
 export interface MsgClientGet {
@@ -355,6 +391,12 @@ export interface MsgClientContact {
   remove?: string;
   user?: string;
   nickname?: string;
+}
+
+export interface MsgClientPin {
+  conv: string;
+  // Message seq to pin (0 to unpin)
+  seq?: number;
 }
 
 // Server message types

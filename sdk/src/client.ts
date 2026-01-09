@@ -228,6 +228,15 @@ export class MVChat2Client {
       case 'react':
         this.emit('react', { conv: info.conv, seq: info.seq, from: info.from, emoji: info.emoji });
         break;
+      case 'pin':
+        this.emit('pin', { conv: info.conv, from: info.from, seq: info.seq });
+        break;
+      case 'unpin':
+        this.emit('unpin', { conv: info.conv, from: info.from });
+        break;
+      case 'disappearing_updated':
+        this.emit('disappearingUpdated', { conv: info.conv, from: info.from });
+        break;
     }
   }
 
@@ -498,6 +507,8 @@ export class MVChat2Client {
         conv: convId,
         content,
         replyTo: options.replyTo,
+        viewOnce: options.viewOnce,
+        viewOnceTTL: options.viewOnceTTL,
       },
     });
 
@@ -623,5 +634,68 @@ export class MVChat2Client {
       inviterPublic: ctrl.params?.inviterPublic,
       conv: ctrl.params?.conv,
     };
+  }
+
+  // Pinned messages
+  async pinMessage(convId: string, seq: number): Promise<void> {
+    await this.request({
+      pin: { conv: convId, seq },
+    });
+  }
+
+  async unpinMessage(convId: string): Promise<void> {
+    await this.request({
+      pin: { conv: convId, seq: 0 },
+    });
+  }
+
+  // Disappearing messages
+  async setDMDisappearingTTL(convId: string, ttl: number | null): Promise<void> {
+    await this.request({
+      dm: { conv: convId, disappearingTTL: ttl ?? 0 },
+    });
+  }
+
+  async setRoomDisappearingTTL(roomId: string, ttl: number | null): Promise<void> {
+    await this.request({
+      room: { id: roomId, action: 'update', disappearingTTL: ttl ?? 0 },
+    });
+  }
+
+  // Room management
+  async inviteToRoom(roomId: string, userId: string): Promise<void> {
+    await this.request({
+      room: { id: roomId, action: 'invite', user: userId },
+    });
+  }
+
+  async leaveRoom(roomId: string): Promise<void> {
+    await this.request({
+      room: { id: roomId, action: 'leave' },
+    });
+  }
+
+  async kickFromRoom(roomId: string, userId: string): Promise<void> {
+    await this.request({
+      room: { id: roomId, action: 'kick', user: userId },
+    });
+  }
+
+  async updateRoom(roomId: string, options: { public?: any }): Promise<void> {
+    await this.request({
+      room: { id: roomId, action: 'update', desc: { public: options.public } },
+    });
+  }
+
+  // DM settings
+  async updateDMSettings(convId: string, options: { favorite?: boolean; muted?: boolean; blocked?: boolean }): Promise<void> {
+    await this.request({
+      dm: {
+        conv: convId,
+        favorite: options.favorite,
+        muted: options.muted,
+        blocked: options.blocked,
+      },
+    });
   }
 }

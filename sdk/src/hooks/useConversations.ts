@@ -9,6 +9,19 @@ export interface UseConversationsResult {
   refresh: () => Promise<void>;
   startDM: (userId: string) => Promise<{ conv: string; created: boolean }>;
   createRoom: (options: { public: any }) => Promise<{ conv: string }>;
+  // Room management
+  inviteToRoom: (roomId: string, userId: string) => Promise<void>;
+  leaveRoom: (roomId: string) => Promise<void>;
+  kickFromRoom: (roomId: string, userId: string) => Promise<void>;
+  updateRoom: (roomId: string, options: { public?: any }) => Promise<void>;
+  // DM settings
+  updateDMSettings: (convId: string, options: { favorite?: boolean; muted?: boolean; blocked?: boolean }) => Promise<void>;
+  // Disappearing messages
+  setDMDisappearingTTL: (convId: string, ttl: number | null) => Promise<void>;
+  setRoomDisappearingTTL: (roomId: string, ttl: number | null) => Promise<void>;
+  // Pinned messages
+  pinMessage: (convId: string, seq: number) => Promise<void>;
+  unpinMessage: (convId: string) => Promise<void>;
 }
 
 export function useConversations(client: MVChat2Client): UseConversationsResult {
@@ -33,6 +46,23 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
     refresh();
   }, [refresh]);
 
+  // Listen for events that affect conversation state
+  useEffect(() => {
+    const handlePin = () => refresh();
+    const handleUnpin = () => refresh();
+    const handleDisappearingUpdated = () => refresh();
+
+    client.on('pin', handlePin);
+    client.on('unpin', handleUnpin);
+    client.on('disappearingUpdated', handleDisappearingUpdated);
+
+    return () => {
+      client.off('pin', handlePin);
+      client.off('unpin', handleUnpin);
+      client.off('disappearingUpdated', handleDisappearingUpdated);
+    };
+  }, [client, refresh]);
+
   const startDM = useCallback(
     async (userId: string) => {
       const result = await client.startDM(userId);
@@ -51,6 +81,80 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
     [client, refresh]
   );
 
+  // Room management
+  const inviteToRoom = useCallback(
+    async (roomId: string, userId: string) => {
+      await client.inviteToRoom(roomId, userId);
+    },
+    [client]
+  );
+
+  const leaveRoom = useCallback(
+    async (roomId: string) => {
+      await client.leaveRoom(roomId);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  const kickFromRoom = useCallback(
+    async (roomId: string, userId: string) => {
+      await client.kickFromRoom(roomId, userId);
+    },
+    [client]
+  );
+
+  const updateRoom = useCallback(
+    async (roomId: string, options: { public?: any }) => {
+      await client.updateRoom(roomId, options);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  // DM settings
+  const updateDMSettings = useCallback(
+    async (convId: string, options: { favorite?: boolean; muted?: boolean; blocked?: boolean }) => {
+      await client.updateDMSettings(convId, options);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  // Disappearing messages
+  const setDMDisappearingTTL = useCallback(
+    async (convId: string, ttl: number | null) => {
+      await client.setDMDisappearingTTL(convId, ttl);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  const setRoomDisappearingTTL = useCallback(
+    async (roomId: string, ttl: number | null) => {
+      await client.setRoomDisappearingTTL(roomId, ttl);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  // Pinned messages
+  const pinMessage = useCallback(
+    async (convId: string, seq: number) => {
+      await client.pinMessage(convId, seq);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
+  const unpinMessage = useCallback(
+    async (convId: string) => {
+      await client.unpinMessage(convId);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
   return {
     conversations,
     isLoading,
@@ -58,5 +162,14 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
     refresh,
     startDM,
     createRoom,
+    inviteToRoom,
+    leaveRoom,
+    kickFromRoom,
+    updateRoom,
+    updateDMSettings,
+    setDMDisappearingTTL,
+    setRoomDisappearingTTL,
+    pinMessage,
+    unpinMessage,
   };
 }
