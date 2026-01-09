@@ -93,6 +93,7 @@ Most critical and high-priority security issues have been resolved. The codebase
 | Reaction race condition | FIXED | SELECT FOR UPDATE in transaction for atomic JSONB update |
 | Sensitive data in logs | FIXED | Added maskEmail() and shortID() helpers, sanitized all log statements |
 | Code duplication | FIXED | Added parseUUID, decodeCredentials, requireMember, broadcastToConv helpers |
+| Missing godoc | VERIFIED | All exported types already have godoc comments |
 
 ### Caddy Security Configuration
 
@@ -128,9 +129,7 @@ None - all medium priority issues have been resolved.
 
 ### Low Priority
 
-| Issue | File | Notes |
-|-------|------|-------|
-| Missing godoc | various | 20+ exported types undocumented |
+None - all low priority issues have been resolved.
 
 ### Testing
 
