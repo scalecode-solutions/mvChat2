@@ -52,6 +52,7 @@ export interface AuthResult {
   inviters?: string[];
   mustChangePassword?: boolean;
   emailVerified?: boolean;
+  lang?: string;
   desc?: {
     public?: UserPublic;
   };
@@ -90,6 +91,8 @@ export interface Conversation {
   pinnedSeq?: number;
   pinnedAt?: string;
   pinnedBy?: string;
+  // No-screenshots flag
+  noScreenshots?: boolean;
 }
 
 export interface ConversationPublic {
@@ -388,6 +391,7 @@ export interface MsgClientAcc {
   desc?: { public?: any; private?: any };
   inviteCode?: string;
   email?: string;
+  lang?: string;
 }
 
 export interface MsgClientSearch {
@@ -414,6 +418,8 @@ export interface MsgClientRoom {
   desc?: { public?: any };
   // Disappearing messages TTL in seconds (0 to disable)
   disappearingTTL?: number;
+  // No-screenshots flag
+  noScreenshots?: boolean;
 }
 
 export interface MsgClientSend {
@@ -426,7 +432,7 @@ export interface MsgClientSend {
 }
 
 export interface MsgClientGet {
-  what: 'conversations' | 'conversation' | 'messages' | 'members' | 'receipts' | 'contacts' | 'user';
+  what: 'conversations' | 'conversation' | 'messages' | 'members' | 'receipts' | 'contacts' | 'user' | 'mentions';
   conv?: string;
   user?: string;
   limit?: number;

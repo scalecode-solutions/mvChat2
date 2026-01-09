@@ -465,6 +465,19 @@ export class MVChat2Client {
     });
   }
 
+  /**
+   * Update the user's preferred language.
+   * @param lang - Language code (e.g., "en", "es", "fr")
+   */
+  async updateLang(lang: string): Promise<void> {
+    await this.request({
+      acc: {
+        user: 'me',
+        lang,
+      },
+    });
+  }
+
   logout(): void {
     this._userID = null;
     this._token = null;
@@ -662,6 +675,17 @@ export class MVChat2Client {
     return ctrl.params?.contacts || [];
   }
 
+  /**
+   * Get messages that mention the current user.
+   * @param limit - Maximum number of messages to return (default: 50)
+   */
+  async getMentions(limit?: number): Promise<Message[]> {
+    const ctrl = await this.request({
+      get: { what: 'mentions', limit },
+    });
+    return ctrl.params?.mentions || [];
+  }
+
   async addContact(userId: string): Promise<void> {
     await this.request({
       contact: { add: userId },
@@ -769,10 +793,15 @@ export class MVChat2Client {
     });
   }
 
-  async updateRoom(roomId: string, options: { public?: any }): Promise<void> {
-    await this.request({
-      room: { id: roomId, action: 'update', desc: { public: options.public } },
-    });
+  async updateRoom(roomId: string, options: { public?: any; noScreenshots?: boolean }): Promise<void> {
+    const room: any = { id: roomId, action: 'update' };
+    if (options.public !== undefined) {
+      room.desc = { public: options.public };
+    }
+    if (options.noScreenshots !== undefined) {
+      room.noScreenshots = options.noScreenshots;
+    }
+    await this.request({ room });
   }
 
   // DM settings

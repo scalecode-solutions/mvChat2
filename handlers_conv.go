@@ -419,6 +419,27 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 		return
 	}
 
+	// Handle no-screenshots update
+	if room.NoScreenshots != nil {
+		if err := h.db.UpdateConversationNoScreenshots(ctx, convID, *room.NoScreenshots); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update no-screenshots"))
+			return
+		}
+
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"noScreenshots": *room.NoScreenshots,
+		}))
+
+		// Broadcast to members
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "room_updated",
+			Ts:             time.Now().UTC(),
+		}, "")
+		return
+	}
+
 	// Get new public data
 	var public json.RawMessage
 	if room.Desc != nil {
@@ -478,6 +499,8 @@ func (h *Handlers) handleGet(s SessionInterface, msg *ClientMessage) {
 		h.handleGetContacts(ctx, s, msg)
 	case "user":
 		h.handleGetUser(ctx, s, msg, get)
+	case "mentions":
+		h.handleGetMentions(ctx, s, msg, get)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown what"))
 	}
@@ -542,6 +565,48 @@ func (h *Handlers) handleGetUser(ctx context.Context, s SessionInterface, msg *C
 			"online":   h.isOnline(user.ID),
 			"lastSeen": user.LastSeen,
 		},
+	}))
+}
+
+func (h *Handlers) handleGetMentions(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
+	limit := get.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	messages, err := h.db.GetMessagesMentioningUser(ctx, s.UserID(), limit)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get mentions"))
+		return
+	}
+
+	results := make([]map[string]any, 0, len(messages))
+	for _, m := range messages {
+		item := map[string]any{
+			"conv": m.ConversationID.String(),
+			"seq":  m.Seq,
+			"from": m.FromUserID.String(),
+			"ts":   m.CreatedAt,
+		}
+		if m.DeletedAt != nil {
+			item["deleted"] = true
+		} else {
+			// Decrypt content
+			plaintext, err := h.encryptor.Decrypt(m.Content)
+			if err == nil {
+				item["content"] = plaintext
+			} else {
+				item["content"] = m.Content
+			}
+		}
+		if m.Head != nil {
+			item["head"] = m.Head
+		}
+		results = append(results, item)
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"mentions": results,
 	}))
 }
 
@@ -624,6 +689,11 @@ func (h *Handlers) handleGetConversation(ctx context.Context, s SessionInterface
 		item["public"] = conv.Public
 	}
 
+	// No-screenshots flag
+	if conv.NoScreenshots {
+		item["noScreenshots"] = true
+	}
+
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"conversation": item,
 	}))
@@ -673,6 +743,10 @@ func (h *Handlers) handleGetConversations(ctx context.Context, s SessionInterfac
 			if c.PinnedBy != nil {
 				item["pinnedBy"] = c.PinnedBy.String()
 			}
+		}
+		// No-screenshots flag
+		if c.NoScreenshots {
+			item["noScreenshots"] = true
 		}
 		results = append(results, item)
 	}
@@ -884,6 +958,20 @@ func (h *Handlers) handleSend(s SessionInterface, msg *ClientMessage) {
 			headMap["view_once_ttl"] = send.ViewOnceTTL
 		}
 	}
+
+	// Extract mentions from content and store in head for queryability
+	var contentData struct {
+		Mentions []struct {
+			UserID   string `json:"userId"`
+			Username string `json:"username,omitempty"`
+			Offset   int    `json:"offset,omitempty"`
+			Length   int    `json:"length,omitempty"`
+		} `json:"mentions,omitempty"`
+	}
+	if err := json.Unmarshal(send.Content, &contentData); err == nil && len(contentData.Mentions) > 0 {
+		headMap["mentions"] = contentData.Mentions
+	}
+
 	if len(headMap) > 0 {
 		head, _ = json.Marshal(headMap)
 	}

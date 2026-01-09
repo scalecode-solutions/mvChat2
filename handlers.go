@@ -191,6 +191,9 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s SessionInterface, msg
 	if user.MustChangePassword {
 		params["mustChangePassword"] = true
 	}
+	if user.Lang != nil {
+		params["lang"] = *user.Lang
+	}
 	s.Send(CtrlSuccess(msg.ID, CodeOK, params))
 }
 
@@ -241,6 +244,9 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s SessionInterface, msg
 	}
 	if user.MustChangePassword {
 		params["mustChangePassword"] = true
+	}
+	if user.Lang != nil {
+		params["lang"] = *user.Lang
 	}
 	s.Send(CtrlSuccess(msg.ID, CodeOK, params))
 }
@@ -490,6 +496,14 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s SessionInterface, 
 	if acc.Email != nil {
 		if err := h.db.UpdateUserEmail(ctx, s.UserID(), acc.Email); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update email"))
+			return
+		}
+	}
+
+	// Update language preference if provided
+	if acc.Lang != nil {
+		if err := h.db.UpdateUserLang(ctx, s.UserID(), acc.Lang); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update language"))
 			return
 		}
 	}

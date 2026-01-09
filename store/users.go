@@ -22,6 +22,7 @@ type User struct {
 	MustChangePassword bool            `json:"mustChangePassword,omitempty"`
 	Email              *string         `json:"email,omitempty"`
 	EmailVerified      bool            `json:"emailVerified,omitempty"`
+	Lang               *string         `json:"lang,omitempty"`
 }
 
 // AuthRecord represents an authentication record.
@@ -67,9 +68,9 @@ func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage,
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var user User
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified, lang
 		FROM users WHERE id = $1 AND state != 'deleted'
-	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified)
+	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified, &user.Lang)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -171,9 +172,9 @@ func (db *DB) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email *stri
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified, lang
 		FROM users WHERE email = $1 AND state != 'deleted'
-	`, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified)
+	`, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified, &user.Lang)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -221,7 +222,7 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	}
 
 	rows, err := db.pool.Query(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified, lang
 		FROM users
 		WHERE state = 'ok'
 		AND public->>'fn' ILIKE '%' || $1 || '%'
@@ -236,12 +237,21 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	var users []User
 	for rows.Next() {
 		var user User
-		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified); err != nil {
+		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified, &user.Lang); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
 	}
 	return users, rows.Err()
+}
+
+// UpdateUserLang updates the user's preferred language.
+func (db *DB) UpdateUserLang(ctx context.Context, userID uuid.UUID, lang *string) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE users SET lang = $2, updated_at = $3
+		WHERE id = $1
+	`, userID, lang, time.Now().UTC())
+	return err
 }
 
 // SetEmailVerificationToken sets a verification token for a user's email.

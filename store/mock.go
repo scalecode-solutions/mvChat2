@@ -19,6 +19,7 @@ type MockStore struct {
 	UpdateUserLastSeenFn    func(ctx context.Context, userID uuid.UUID, userAgent string) error
 	UpdateUserPublicFn      func(ctx context.Context, userID uuid.UUID, public json.RawMessage) error
 	UpdateUserEmailFn       func(ctx context.Context, userID uuid.UUID, email *string) error
+	UpdateUserLangFn        func(ctx context.Context, userID uuid.UUID, lang *string) error
 	SearchUsersFn           func(ctx context.Context, query string, limit int) ([]User, error)
 
 	// Auth
@@ -67,6 +68,9 @@ type MockStore struct {
 	UpdateConversationDisappearingTTLFn func(ctx context.Context, convID uuid.UUID, ttl *int) error
 	GetConversationDisappearingTTLFn    func(ctx context.Context, convID uuid.UUID) (*int, error)
 
+	// No-screenshots
+	UpdateConversationNoScreenshotsFn func(ctx context.Context, convID uuid.UUID, noScreenshots bool) error
+
 	// Messages
 	CreateMessageFn            func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
 	GetMessagesFn              func(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
@@ -76,7 +80,8 @@ type MockStore struct {
 	DeleteMessageForEveryoneFn func(ctx context.Context, convID uuid.UUID, seq int) error
 	DeleteMessageForUserFn     func(ctx context.Context, msgID, userID uuid.UUID) error
 	AddReactionFn              func(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
-	GetEditCountFn             func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+	GetEditCountFn                 func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+	GetMessagesMentioningUserFn    func(ctx context.Context, userID uuid.UUID, limit int) ([]Message, error)
 
 	// View-once and message reads
 	CreateMessageWithViewOnceFn func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error)
@@ -169,6 +174,13 @@ func (m *MockStore) UpdateUserPublic(ctx context.Context, userID uuid.UUID, publ
 func (m *MockStore) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email *string) error {
 	if m.UpdateUserEmailFn != nil {
 		return m.UpdateUserEmailFn(ctx, userID, email)
+	}
+	return nil
+}
+
+func (m *MockStore) UpdateUserLang(ctx context.Context, userID uuid.UUID, lang *string) error {
+	if m.UpdateUserLangFn != nil {
+		return m.UpdateUserLangFn(ctx, userID, lang)
 	}
 	return nil
 }
@@ -404,6 +416,13 @@ func (m *MockStore) GetConversationDisappearingTTL(ctx context.Context, convID u
 	return nil, nil
 }
 
+func (m *MockStore) UpdateConversationNoScreenshots(ctx context.Context, convID uuid.UUID, noScreenshots bool) error {
+	if m.UpdateConversationNoScreenshotsFn != nil {
+		return m.UpdateConversationNoScreenshotsFn(ctx, convID, noScreenshots)
+	}
+	return nil
+}
+
 func (m *MockStore) CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error) {
 	if m.CreateMessageFn != nil {
 		return m.CreateMessageFn(ctx, convID, fromUserID, content, head)
@@ -465,6 +484,13 @@ func (m *MockStore) GetEditCount(ctx context.Context, convID uuid.UUID, seq int)
 		return m.GetEditCountFn(ctx, convID, seq)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) GetMessagesMentioningUser(ctx context.Context, userID uuid.UUID, limit int) ([]Message, error) {
+	if m.GetMessagesMentioningUserFn != nil {
+		return m.GetMessagesMentioningUserFn(ctx, userID, limit)
+	}
+	return nil, nil
 }
 
 func (m *MockStore) CreateMessageWithViewOnce(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error) {

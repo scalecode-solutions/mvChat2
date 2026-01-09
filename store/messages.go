@@ -490,3 +490,36 @@ func (db *DB) GetMessageByID(ctx context.Context, messageID uuid.UUID) (*Message
 	}
 	return &msg, nil
 }
+
+// GetMessagesMentioningUser retrieves messages that mention a specific user.
+// Uses the GIN index on head->'mentions' for efficient querying.
+func (db *DB) GetMessagesMentioningUser(ctx context.Context, userID uuid.UUID, limit int) ([]Message, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	rows, err := db.pool.Query(ctx, `
+		SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at, m.view_once, m.view_once_ttl
+		FROM messages m
+		JOIN members mem ON m.conversation_id = mem.conversation_id AND mem.user_id = $1 AND mem.deleted_at IS NULL
+		WHERE m.head->'mentions' @> $2::jsonb
+			AND m.deleted_at IS NULL
+		ORDER BY m.created_at DESC
+		LIMIT $3
+	`, userID, `[{"userId":"`+userID.String()+`"}]`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var msg Message
+		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Seq, &msg.FromUserID,
+			&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt, &msg.ViewOnce, &msg.ViewOnceTTL); err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+	return messages, rows.Err()
+}

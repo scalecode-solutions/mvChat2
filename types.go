@@ -75,6 +75,8 @@ type MsgClientAcc struct {
 	InviteCode string `json:"inviteCode,omitempty"`
 	// For account update: new email address
 	Email *string `json:"email,omitempty"`
+	// For account update: preferred language (e.g., "en", "es", "fr")
+	Lang *string `json:"lang,omitempty"`
 }
 
 // MsgSetDesc is public/private data for account or conversation.
@@ -116,6 +118,8 @@ type MsgClientRoom struct {
 	Desc *MsgSetDesc `json:"desc,omitempty"`
 	// Disappearing messages TTL in seconds (nil = no change, 0 = disable)
 	DisappearingTTL *int `json:"disappearingTTL,omitempty"`
+	// No-screenshots flag (nil = no change)
+	NoScreenshots *bool `json:"noScreenshots,omitempty"`
 }
 
 // MsgClientSend is for sending a message.
@@ -349,4 +353,6 @@ type ConversationInfo struct {
 	PinnedSeq *int       `json:"pinnedSeq,omitempty"`
 	PinnedAt  *time.Time `json:"pinnedAt,omitempty"`
 	PinnedBy  *string    `json:"pinnedBy,omitempty"`
+	// No-screenshots flag
+	NoScreenshots bool `json:"noScreenshots,omitempty"`
 }

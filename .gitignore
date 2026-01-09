@@ -32,3 +32,6 @@ static/
 # Environment files
 .env
 .env.local
+
+# Test client (local development only)
+examples/

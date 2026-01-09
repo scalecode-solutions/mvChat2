@@ -23,6 +23,7 @@ type Store interface {
 	UpdateUserLastSeen(ctx context.Context, userID uuid.UUID, userAgent string) error
 	UpdateUserPublic(ctx context.Context, userID uuid.UUID, public json.RawMessage) error
 	UpdateUserEmail(ctx context.Context, userID uuid.UUID, email *string) error
+	UpdateUserLang(ctx context.Context, userID uuid.UUID, lang *string) error
 	SearchUsers(ctx context.Context, query string, limit int) ([]User, error)
 
 	// Auth
@@ -71,6 +72,9 @@ type Store interface {
 	UpdateConversationDisappearingTTL(ctx context.Context, convID uuid.UUID, ttl *int) error
 	GetConversationDisappearingTTL(ctx context.Context, convID uuid.UUID) (*int, error)
 
+	// No-screenshots
+	UpdateConversationNoScreenshots(ctx context.Context, convID uuid.UUID, noScreenshots bool) error
+
 	// Messages
 	CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
 	GetMessages(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
@@ -81,6 +85,7 @@ type Store interface {
 	DeleteMessageForUser(ctx context.Context, msgID, userID uuid.UUID) error
 	AddReaction(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
 	GetEditCount(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+	GetMessagesMentioningUser(ctx context.Context, userID uuid.UUID, limit int) ([]Message, error)
 
 	// View-once and message reads
 	CreateMessageWithViewOnce(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error)

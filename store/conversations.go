@@ -27,6 +27,8 @@ type Conversation struct {
 	PinnedMessageID *uuid.UUID `json:"pinnedMessageId,omitempty"`
 	PinnedAt        *time.Time `json:"pinnedAt,omitempty"`
 	PinnedBy        *uuid.UUID `json:"pinnedBy,omitempty"`
+	// No-screenshots flag (set by owner/admin for rooms)
+	NoScreenshots bool `json:"noScreenshots,omitempty"`
 }
 
 // Member represents a user's membership in a conversation.
@@ -189,11 +191,11 @@ func (db *DB) GetConversationByID(ctx context.Context, id uuid.UUID) (*Conversat
 	var conv Conversation
 	err := db.pool.QueryRow(ctx, `
 		SELECT id, created_at, updated_at, type, owner_id, public, last_seq, last_msg_at, del_id,
-			disappearing_ttl, pinned_message_id, pinned_at, pinned_by
+			disappearing_ttl, pinned_message_id, pinned_at, pinned_by, no_screenshots
 		FROM conversations WHERE id = $1
 	`, id).Scan(&conv.ID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Type, &conv.OwnerID, &conv.Public,
 		&conv.LastSeq, &conv.LastMsgAt, &conv.DelID,
-		&conv.DisappearingTTL, &conv.PinnedMessageID, &conv.PinnedAt, &conv.PinnedBy)
+		&conv.DisappearingTTL, &conv.PinnedMessageID, &conv.PinnedAt, &conv.PinnedBy, &conv.NoScreenshots)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -230,7 +232,7 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 	rows, err := db.pool.Query(ctx, `
 		SELECT
 			c.id, c.created_at, c.updated_at, c.type, c.owner_id, c.public, c.last_seq, c.last_msg_at, c.del_id,
-			c.disappearing_ttl, c.pinned_message_id, c.pinned_at, c.pinned_by,
+			c.disappearing_ttl, c.pinned_message_id, c.pinned_at, c.pinned_by, c.no_screenshots,
 			m.created_at, m.updated_at, m.role, m.read_seq, m.recv_seq, m.clear_seq, m.favorite, m.muted, m.blocked, m.private,
 			-- DM other user fields (NULL for rooms)
 			ou.id, ou.created_at, ou.updated_at, ou.state, ou.public, ou.last_seen, ou.user_agent,
@@ -277,7 +279,7 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 			&cwm.Conversation.Type, &cwm.Conversation.OwnerID, &cwm.Conversation.Public,
 			&cwm.Conversation.LastSeq, &cwm.Conversation.LastMsgAt, &cwm.Conversation.DelID,
 			&cwm.Conversation.DisappearingTTL, &cwm.Conversation.PinnedMessageID,
-			&cwm.Conversation.PinnedAt, &cwm.Conversation.PinnedBy,
+			&cwm.Conversation.PinnedAt, &cwm.Conversation.PinnedBy, &cwm.Conversation.NoScreenshots,
 			&cwm.MemberCreatedAt, &cwm.MemberUpdatedAt, &cwm.Role,
 			&cwm.ReadSeq, &cwm.RecvSeq, &cwm.ClearSeq,
 			&cwm.Favorite, &cwm.Muted, &cwm.Blocked, &cwm.Private,
@@ -573,4 +575,14 @@ func (db *DB) GetConversationDisappearingTTL(ctx context.Context, convID uuid.UU
 		return nil, nil
 	}
 	return ttl, err
+}
+
+// UpdateConversationNoScreenshots sets the no-screenshots flag for a conversation.
+func (db *DB) UpdateConversationNoScreenshots(ctx context.Context, convID uuid.UUID, noScreenshots bool) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE conversations SET no_screenshots = $2, updated_at = $3
+		WHERE id = $1
+	`, convID, noScreenshots, now)
+	return err
 }
