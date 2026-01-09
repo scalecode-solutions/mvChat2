@@ -41,7 +41,7 @@ func (h *Handlers) handleAddContact(ctx context.Context, s *Session, msg *Client
 	}
 
 	// Can't add yourself
-	if contactID == s.userID {
+	if contactID == s.UserID() {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "cannot add yourself as contact"))
 		return
 	}
@@ -58,7 +58,7 @@ func (h *Handlers) handleAddContact(ctx context.Context, s *Session, msg *Client
 	}
 
 	// Add contact (manual source, no invite)
-	err = h.db.AddContact(ctx, s.userID, contactID, "manual", nil)
+	err = h.db.AddContact(ctx, s.UserID(), contactID, "manual", nil)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to add contact"))
 		return
@@ -77,7 +77,7 @@ func (h *Handlers) handleRemoveContact(ctx context.Context, s *Session, msg *Cli
 		return
 	}
 
-	err = h.db.RemoveContact(ctx, s.userID, contactID)
+	err = h.db.RemoveContact(ctx, s.UserID(), contactID)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to remove contact"))
 		return
@@ -93,7 +93,7 @@ func (h *Handlers) handleUpdateContactNickname(ctx context.Context, s *Session, 
 		return
 	}
 
-	err = h.db.UpdateContactNickname(ctx, s.userID, contactID, nickname)
+	err = h.db.UpdateContactNickname(ctx, s.UserID(), contactID, nickname)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update nickname"))
 		return

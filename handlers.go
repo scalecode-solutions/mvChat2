@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/scalecode-solutions/mvchat2/auth"
 	"github.com/scalecode-solutions/mvchat2/config"
 	"github.com/scalecode-solutions/mvchat2/crypto"
@@ -21,6 +22,54 @@ const handlerTimeout = 30 * time.Second
 // handlerCtx creates a context with the standard handler timeout.
 func handlerCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), handlerTimeout)
+}
+
+// parseUUID parses a UUID string and sends an error response if invalid.
+// Returns the parsed UUID and true on success, or uuid.Nil and false on failure.
+func parseUUID(s *Session, msgID, uuidStr, field string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(uuidStr)
+	if err != nil {
+		s.Send(CtrlError(msgID, CodeBadRequest, "invalid "+field))
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// decodeCredentials decodes a base64-encoded "username:password" string.
+// Returns the username, password, and true on success.
+func decodeCredentials(s *Session, msgID, secret string) (username, password string, ok bool) {
+	decoded, err := base64.StdEncoding.DecodeString(secret)
+	if err != nil {
+		s.Send(CtrlError(msgID, CodeBadRequest, "invalid secret encoding"))
+		return "", "", false
+	}
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		s.Send(CtrlError(msgID, CodeBadRequest, "invalid secret format"))
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
+
+// requireMember checks if the user is a member of the conversation.
+// Returns true if member, false otherwise (after sending error response).
+func (h *Handlers) requireMember(ctx context.Context, s *Session, msgID string, convID uuid.UUID) bool {
+	isMember, err := h.db.IsMember(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msgID, CodeInternalError, "database error"))
+		return false
+	}
+	if !isMember {
+		s.Send(CtrlError(msgID, CodeForbidden, "not a member"))
+		return false
+	}
+	return true
+}
+
+// broadcastToConv sends an Info message to all members of a conversation.
+func (h *Handlers) broadcastToConv(ctx context.Context, convID uuid.UUID, info *MsgServerInfo, skipSession string) {
+	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
+	h.hub.SendToUsers(memberIDs, &ServerMessage{Info: info}, skipSession)
 }
 
 // Handlers holds dependencies for request handlers.
@@ -69,19 +118,10 @@ func (h *Handlers) HandleLogin(s *Session, msg *ClientMessage) {
 }
 
 func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *ClientMessage, secret string) {
-	// Decode base64 secret (username:password)
-	decoded, err := base64.StdEncoding.DecodeString(secret)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret encoding"))
+	username, password, ok := decodeCredentials(s, msg.ID, secret)
+	if !ok {
 		return
 	}
-
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret format"))
-		return
-	}
-	username, password := parts[0], parts[1]
 
 	// Look up auth record
 	authRec, err := h.db.GetAuthByUsername(ctx, username)
@@ -209,19 +249,10 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		return
 	}
 
-	// Decode secret (username:password)
-	decoded, err := base64.StdEncoding.DecodeString(acc.Secret)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret encoding"))
+	username, password, ok := decodeCredentials(s, msg.ID, acc.Secret)
+	if !ok {
 		return
 	}
-
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret format"))
-		return
-	}
-	username, password := parts[0], parts[1]
 
 	// Validate username and password
 	if err := h.auth.ValidateUsername(username); err != nil {
@@ -376,19 +407,10 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 
 	// Handle password change if secret is provided
 	if acc.Secret != "" {
-		// Decode secret (oldPassword:newPassword)
-		decoded, err := base64.StdEncoding.DecodeString(acc.Secret)
-		if err != nil {
-			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret encoding"))
+		oldPassword, newPassword, ok := decodeCredentials(s, msg.ID, acc.Secret)
+		if !ok {
 			return
 		}
-
-		parts := strings.SplitN(string(decoded), ":", 2)
-		if len(parts) != 2 {
-			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid secret format (expected oldPassword:newPassword)"))
-			return
-		}
-		oldPassword, newPassword := parts[0], parts[1]
 
 		// Validate new password
 		if err := h.auth.ValidatePassword(newPassword); err != nil {

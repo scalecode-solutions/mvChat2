@@ -40,13 +40,12 @@ func (h *Handlers) HandleDM(s *Session, msg *ClientMessage) {
 }
 
 func (h *Handlers) handleStartDM(ctx context.Context, s *Session, msg *ClientMessage, dm *MsgClientDM) {
-	otherUserID, err := uuid.Parse(dm.User)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid user id"))
+	otherUserID, ok := parseUUID(s, msg.ID, dm.User, "user id")
+	if !ok {
 		return
 	}
 
-	if otherUserID == s.userID {
+	if otherUserID == s.UserID() {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "cannot DM yourself"))
 		return
 	}
@@ -63,7 +62,7 @@ func (h *Handlers) handleStartDM(ctx context.Context, s *Session, msg *ClientMes
 	}
 
 	// Create or get existing DM
-	conv, created, err := h.db.CreateDM(ctx, s.userID, otherUserID)
+	conv, created, err := h.db.CreateDM(ctx, s.UserID(), otherUserID)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create dm"))
 		return
@@ -86,20 +85,12 @@ func (h *Handlers) handleStartDM(ctx context.Context, s *Session, msg *ClientMes
 }
 
 func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMessage, dm *MsgClientDM) {
-	convID, err := uuid.Parse(dm.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, dm.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
-	// Check membership
-	isMember, err := h.db.IsMember(ctx, convID, s.userID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
-		return
-	}
-	if !isMember {
-		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+	if !h.requireMember(ctx, s, msg.ID, convID) {
 		return
 	}
 
@@ -117,7 +108,7 @@ func (h *Handlers) handleManageDM(ctx context.Context, s *Session, msg *ClientMe
 		return
 	}
 
-	if err := h.db.UpdateMemberSettings(ctx, convID, s.userID, settings); err != nil {
+	if err := h.db.UpdateMemberSettings(ctx, convID, s.UserID(), settings); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update"))
 		return
 	}
@@ -155,7 +146,7 @@ func (h *Handlers) handleCreateRoom(ctx context.Context, s *Session, msg *Client
 		public = room.Desc.Public
 	}
 
-	conv, err := h.db.CreateRoom(ctx, s.userID, public)
+	conv, err := h.db.CreateRoom(ctx, s.UserID(), public)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create room"))
 		return
@@ -199,7 +190,7 @@ func (h *Handlers) HandleGet(s *Session, msg *ClientMessage) {
 }
 
 func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *ClientMessage) {
-	contacts, err := h.db.GetContacts(ctx, s.userID)
+	contacts, err := h.db.GetContacts(ctx, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get contacts"))
 		return
@@ -234,7 +225,7 @@ func (h *Handlers) handleGetContacts(ctx context.Context, s *Session, msg *Clien
 }
 
 func (h *Handlers) handleGetConversations(ctx context.Context, s *Session, msg *ClientMessage) {
-	convs, err := h.db.GetUserConversations(ctx, s.userID)
+	convs, err := h.db.GetUserConversations(ctx, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get conversations"))
 		return
@@ -278,14 +269,13 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s *Session, msg *Clien
 		return
 	}
 
-	convID, err := uuid.Parse(get.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, get.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
 	// Check membership and get clear_seq
-	member, err := h.db.GetMember(ctx, convID, s.userID)
+	member, err := h.db.GetMember(ctx, convID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
 		return
@@ -295,7 +285,7 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s *Session, msg *Clien
 		return
 	}
 
-	messages, err := h.db.GetMessages(ctx, convID, s.userID, get.Before, get.Limit, member.ClearSeq)
+	messages, err := h.db.GetMessages(ctx, convID, s.UserID(), get.Before, get.Limit, member.ClearSeq)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get messages"))
 		return
@@ -336,20 +326,12 @@ func (h *Handlers) handleGetMembers(ctx context.Context, s *Session, msg *Client
 		return
 	}
 
-	convID, err := uuid.Parse(get.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, get.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
-	// Check membership
-	isMember, err := h.db.IsMember(ctx, convID, s.userID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
-		return
-	}
-	if !isMember {
-		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+	if !h.requireMember(ctx, s, msg.ID, convID) {
 		return
 	}
 
@@ -383,20 +365,12 @@ func (h *Handlers) handleGetReceipts(ctx context.Context, s *Session, msg *Clien
 		return
 	}
 
-	convID, err := uuid.Parse(get.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, get.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
-	// Check membership
-	isMember, err := h.db.IsMember(ctx, convID, s.userID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
-		return
-	}
-	if !isMember {
-		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+	if !h.requireMember(ctx, s, msg.ID, convID) {
 		return
 	}
 
@@ -435,14 +409,13 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(send.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, send.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
 	// Check membership
-	member, err := h.db.GetMember(ctx, convID, s.userID)
+	member, err := h.db.GetMember(ctx, convID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
 		return
@@ -461,9 +434,9 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 
 	if conv.Type == "dm" {
 		// Check if the other user blocked us
-		otherUser, _ := h.db.GetDMOtherUser(ctx, convID, s.userID)
+		otherUser, _ := h.db.GetDMOtherUser(ctx, convID, s.UserID())
 		if otherUser != nil {
-			blocked, _ := h.db.IsBlocked(ctx, convID, otherUser.ID, s.userID)
+			blocked, _ := h.db.IsBlocked(ctx, convID, otherUser.ID, s.UserID())
 			if blocked {
 				s.Send(CtrlError(msg.ID, CodeForbidden, "blocked"))
 				return
@@ -485,7 +458,7 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 	}
 
 	// Create message
-	message, err := h.db.CreateMessage(ctx, convID, s.userID, content, head)
+	message, err := h.db.CreateMessage(ctx, convID, s.UserID(), content, head)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to send"))
 		return
@@ -508,7 +481,7 @@ func (h *Handlers) HandleSend(s *Session, msg *ClientMessage) {
 		Data: &MsgServerData{
 			ConversationID: convID.String(),
 			Seq:            message.Seq,
-			From:           s.userID.String(),
+			From:           s.UserID().String(),
 			Content:        send.Content,
 			Head:           headMap,
 			Ts:             message.CreatedAt,
@@ -532,9 +505,8 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(edit.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, edit.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
@@ -550,7 +522,7 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 	}
 
 	// Only sender can edit
-	if origMsg.FromUserID != s.userID {
+	if origMsg.FromUserID != s.UserID() {
 		s.Send(CtrlError(msg.ID, CodeForbidden, "not your message"))
 		return
 	}
@@ -588,18 +560,14 @@ func (h *Handlers) HandleEdit(s *Session, msg *ClientMessage) {
 	}))
 
 	// Broadcast edit to members
-	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	infoMsg := &ServerMessage{
-		Info: &MsgServerInfo{
-			ConversationID: convID.String(),
-			From:           s.userID.String(),
-			What:           "edit",
-			Seq:            edit.Seq,
-			Content:        edit.Content,
-			Ts:             now,
-		},
-	}
-	h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "edit",
+		Seq:            edit.Seq,
+		Content:        edit.Content,
+		Ts:             now,
+	}, s.id)
 }
 
 // HandleUnsend processes unsend message requests.
@@ -617,9 +585,8 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(unsend.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, unsend.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
@@ -635,7 +602,7 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 	}
 
 	// Only sender can unsend
-	if origMsg.FromUserID != s.userID {
+	if origMsg.FromUserID != s.UserID() {
 		s.Send(CtrlError(msg.ID, CodeForbidden, "not your message"))
 		return
 	}
@@ -651,21 +618,16 @@ func (h *Handlers) HandleUnsend(s *Session, msg *ClientMessage) {
 		return
 	}
 
-	now := time.Now().UTC()
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 
 	// Broadcast unsend to members
-	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	infoMsg := &ServerMessage{
-		Info: &MsgServerInfo{
-			ConversationID: convID.String(),
-			From:           s.userID.String(),
-			What:           "unsend",
-			Seq:            unsend.Seq,
-			Ts:             now,
-		},
-	}
-	h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "unsend",
+		Seq:            unsend.Seq,
+		Ts:             time.Now().UTC(),
+	}, s.id)
 }
 
 // HandleDelete processes delete message requests (for me or for everyone).
@@ -683,9 +645,8 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(del.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, del.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
@@ -702,7 +663,7 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 
 	if del.ForEveryone {
 		// Only sender can delete for everyone
-		if origMsg.FromUserID != s.userID {
+		if origMsg.FromUserID != s.UserID() {
 			s.Send(CtrlError(msg.ID, CodeForbidden, "not your message"))
 			return
 		}
@@ -715,20 +676,16 @@ func (h *Handlers) HandleDelete(s *Session, msg *ClientMessage) {
 		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 
 		// Broadcast to members
-		memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-		infoMsg := &ServerMessage{
-			Info: &MsgServerInfo{
-				ConversationID: convID.String(),
-				From:           s.userID.String(),
-				What:           "delete",
-				Seq:            del.Seq,
-				Ts:             time.Now().UTC(),
-			},
-		}
-		h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "delete",
+			Seq:            del.Seq,
+			Ts:             time.Now().UTC(),
+		}, s.id)
 	} else {
 		// Delete for me only
-		if err := h.db.DeleteMessageForUser(ctx, origMsg.ID, s.userID); err != nil {
+		if err := h.db.DeleteMessageForUser(ctx, origMsg.ID, s.UserID()); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to delete"))
 			return
 		}
@@ -751,44 +708,31 @@ func (h *Handlers) HandleReact(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(react.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, react.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
-	// Check membership
-	isMember, err := h.db.IsMember(ctx, convID, s.userID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
-		return
-	}
-	if !isMember {
-		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+	if !h.requireMember(ctx, s, msg.ID, convID) {
 		return
 	}
 
-	if err := h.db.AddReaction(ctx, convID, react.Seq, s.userID, react.Emoji); err != nil {
+	if err := h.db.AddReaction(ctx, convID, react.Seq, s.UserID(), react.Emoji); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to react"))
 		return
 	}
 
-	now := time.Now().UTC()
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 
 	// Broadcast to members
-	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	infoMsg := &ServerMessage{
-		Info: &MsgServerInfo{
-			ConversationID: convID.String(),
-			From:           s.userID.String(),
-			What:           "react",
-			Seq:            react.Seq,
-			Emoji:          react.Emoji,
-			Ts:             now,
-		},
-	}
-	h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "react",
+		Seq:            react.Seq,
+		Emoji:          react.Emoji,
+		Ts:             time.Now().UTC(),
+	}, s.id)
 }
 
 // HandleTyping processes typing indicator requests.
@@ -808,27 +752,22 @@ func (h *Handlers) HandleTyping(s *Session, msg *ClientMessage) {
 
 	convID, err := uuid.Parse(typing.ConversationID)
 	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
-		return
+		return // Silently ignore invalid conv
 	}
 
 	// Check membership
-	isMember, err := h.db.IsMember(ctx, convID, s.userID)
+	isMember, err := h.db.IsMember(ctx, convID, s.UserID())
 	if err != nil || !isMember {
 		return // Silently ignore
 	}
 
 	// Broadcast to members (no response to sender)
-	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	infoMsg := &ServerMessage{
-		Info: &MsgServerInfo{
-			ConversationID: convID.String(),
-			From:           s.userID.String(),
-			What:           "typing",
-			Ts:             time.Now().UTC(),
-		},
-	}
-	h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "typing",
+		Ts:             time.Now().UTC(),
+	}, s.id)
 }
 
 // HandleRead processes read receipt requests.
@@ -846,14 +785,13 @@ func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 
-	convID, err := uuid.Parse(read.ConversationID)
-	if err != nil {
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid conv id"))
+	convID, ok := parseUUID(s, msg.ID, read.ConversationID, "conv id")
+	if !ok {
 		return
 	}
 
 	// Update read seq
-	if err := h.db.UpdateReadSeq(ctx, convID, s.userID, read.Seq); err != nil {
+	if err := h.db.UpdateReadSeq(ctx, convID, s.UserID(), read.Seq); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update"))
 		return
 	}
@@ -861,15 +799,11 @@ func (h *Handlers) HandleRead(s *Session, msg *ClientMessage) {
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 
 	// Broadcast to members
-	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	infoMsg := &ServerMessage{
-		Info: &MsgServerInfo{
-			ConversationID: convID.String(),
-			From:           s.userID.String(),
-			What:           "read",
-			Seq:            read.Seq,
-			Ts:             time.Now().UTC(),
-		},
-	}
-	h.hub.SendToUsers(memberIDs, infoMsg, s.id)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "read",
+		Seq:            read.Seq,
+		Ts:             time.Now().UTC(),
+	}, s.id)
 }

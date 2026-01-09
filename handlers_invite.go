@@ -49,7 +49,7 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 	}
 
 	// Get inviter's username (needed for cryptographic token)
-	inviterUsername, err := h.db.GetUserUsername(ctx, s.userID)
+	inviterUsername, err := h.db.GetUserUsername(ctx, s.UserID())
 	if err != nil || inviterUsername == "" {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get user info"))
 		return
@@ -82,7 +82,7 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 	}
 
 	// Create invite record in database with both code and encrypted token
-	invite, err := h.db.CreateInviteCode(ctx, s.userID, shortCode, encryptedToken, inviteeEmail, name)
+	invite, err := h.db.CreateInviteCode(ctx, s.UserID(), shortCode, encryptedToken, inviteeEmail, name)
 	if err != nil {
 		log.Printf("invite: failed to create invite: %v", err)
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create invite"))
@@ -91,7 +91,7 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 
 	// Get inviter's display name for the email
 	inviterName := "Someone"
-	inviter, _ := h.db.GetUserByID(ctx, s.userID)
+	inviter, _ := h.db.GetUserByID(ctx, s.UserID())
 	if inviter != nil && inviter.Public != nil {
 		var pub map[string]any
 		if json.Unmarshal(inviter.Public, &pub) == nil {
@@ -126,7 +126,7 @@ func (h *Handlers) handleCreateInvite(ctx context.Context, s *Session, msg *Clie
 }
 
 func (h *Handlers) handleListInvites(ctx context.Context, s *Session, msg *ClientMessage) {
-	invites, err := h.db.GetUserInvites(ctx, s.userID)
+	invites, err := h.db.GetUserInvites(ctx, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get invites"))
 		return
@@ -169,7 +169,7 @@ func (h *Handlers) handleRevokeInvite(ctx context.Context, s *Session, msg *Clie
 		return
 	}
 
-	err = h.db.RevokeInvite(ctx, inviteID, s.userID)
+	err = h.db.RevokeInvite(ctx, inviteID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeNotFound, "invite not found or already used"))
 		return
@@ -213,7 +213,7 @@ func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, m
 	}
 
 	// Mark the invite as used
-	usedInvite, err := h.db.UseInvite(ctx, invite.ID, s.userID)
+	usedInvite, err := h.db.UseInvite(ctx, invite.ID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to redeem invite"))
 		return
@@ -224,7 +224,7 @@ func (h *Handlers) handleRedeemInviteExisting(ctx context.Context, s *Session, m
 	}
 
 	// Create DM and contact with the inviter
-	conv, _, err := h.db.CreateDM(ctx, invite.InviterID, s.userID)
+	conv, _, err := h.db.CreateDM(ctx, invite.InviterID, s.UserID())
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create conversation"))
 		return
