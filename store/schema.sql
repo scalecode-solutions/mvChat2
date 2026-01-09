@@ -261,7 +261,7 @@ CREATE TABLE schema_version (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES (6);
+INSERT INTO schema_version (version) VALUES (8);
 
 -- ============================================================================
 -- INVITE CODES
