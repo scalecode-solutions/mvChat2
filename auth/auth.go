@@ -82,30 +82,17 @@ func (a *Auth) HashPassword(password string) (string, error) {
 
 // VerifyPassword verifies a password against a hash.
 func (a *Auth) VerifyPassword(password, encoded string) bool {
-	// Parse the encoded hash
-	var salt, hash []byte
-	var err error
-
-	// Expected format: $argon2id$salt$hash
-	var saltStr, hashStr string
-	_, err = fmt.Sscanf(encoded, "$argon2id$%s$%s", &saltStr, &hashStr)
-	if err != nil {
-		return false
-	}
-
-	// Handle the case where Sscanf doesn't split on $
+	// Parse the encoded hash - expected format: $argon2id$salt$hash
 	parts := splitArgon2Hash(encoded)
-	if len(parts) != 3 {
+	if len(parts) != 3 || parts[0] != "argon2id" {
 		return false
 	}
-	saltStr = parts[1]
-	hashStr = parts[2]
 
-	salt, err = base64.RawStdEncoding.DecodeString(saltStr)
+	salt, err := base64.RawStdEncoding.DecodeString(parts[1])
 	if err != nil {
 		return false
 	}
-	hash, err = base64.RawStdEncoding.DecodeString(hashStr)
+	hash, err := base64.RawStdEncoding.DecodeString(parts[2])
 	if err != nil {
 		return false
 	}

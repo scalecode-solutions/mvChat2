@@ -35,6 +35,8 @@ func (s *testSession) ID() string { return s.id }
 
 func (s *testSession) UserID() uuid.UUID { return s.userID }
 
+func (s *testSession) UserAgent() string { return "test-agent/1.0" }
+
 func (s *testSession) IsAuthenticated() bool { return s.userID != uuid.Nil }
 
 func (s *testSession) RequireAuth(msgID string) bool {

@@ -7,6 +7,7 @@ import "github.com/google/uuid"
 type SessionInterface interface {
 	ID() string
 	UserID() uuid.UUID
+	UserAgent() string
 	IsAuthenticated() bool
 	RequireAuth(msgID string) bool
 	Send(msg *ServerMessage)

@@ -37,7 +37,7 @@ func parseUUID(s *Session, msgID, uuidStr, field string) (uuid.UUID, bool) {
 
 // decodeCredentials decodes a base64-encoded "username:password" string.
 // Returns the username, password, and true on success.
-func decodeCredentials(s *Session, msgID, secret string) (username, password string, ok bool) {
+func decodeCredentials(s SessionInterface, msgID, secret string) (username, password string, ok bool) {
 	decoded, err := base64.StdEncoding.DecodeString(secret)
 	if err != nil {
 		s.Send(CtrlError(msgID, CodeBadRequest, "invalid secret encoding"))
@@ -98,6 +98,10 @@ func NewHandlers(db store.Store, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, 
 
 // HandleLogin processes login requests.
 func (h *Handlers) HandleLogin(s *Session, msg *ClientMessage) {
+	h.handleLogin(s, msg)
+}
+
+func (h *Handlers) handleLogin(s SessionInterface, msg *ClientMessage) {
 	login := msg.Login
 	if login == nil {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing login data"))
@@ -117,7 +121,7 @@ func (h *Handlers) HandleLogin(s *Session, msg *ClientMessage) {
 	}
 }
 
-func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *ClientMessage, secret string) {
+func (h *Handlers) handleBasicLogin(ctx context.Context, s SessionInterface, msg *ClientMessage, secret string) {
 	username, password, ok := decodeCredentials(s, msg.ID, secret)
 	if !ok {
 		return
@@ -154,8 +158,12 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *Client
 		return
 	}
 
-	// Authenticate session
-	h.hub.AuthenticateSession(s, user.ID)
+	// Authenticate session (only if hub is available - nil in tests)
+	if h.hub != nil {
+		if sess, ok := s.(*Session); ok {
+			h.hub.AuthenticateSession(sess, user.ID)
+		}
+	}
 
 	// Update last seen
 	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
@@ -175,7 +183,7 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *Client
 	s.Send(CtrlSuccess(msg.ID, CodeOK, params))
 }
 
-func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *ClientMessage, secret string) {
+func (h *Handlers) handleTokenLogin(ctx context.Context, s SessionInterface, msg *ClientMessage, secret string) {
 	// Validate token
 	claims, err := h.auth.ValidateToken(secret)
 	if err != nil {
@@ -194,8 +202,12 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *Client
 		return
 	}
 
-	// Authenticate session
-	h.hub.AuthenticateSession(s, user.ID)
+	// Authenticate session (only if hub is available - nil in tests)
+	if h.hub != nil {
+		if sess, ok := s.(*Session); ok {
+			h.hub.AuthenticateSession(sess, user.ID)
+		}
+	}
 
 	// Update last seen
 	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
@@ -224,6 +236,10 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *Client
 
 // HandleAcc processes account creation/update requests.
 func (h *Handlers) HandleAcc(s *Session, msg *ClientMessage) {
+	h.handleAcc(s, msg)
+}
+
+func (h *Handlers) handleAcc(s SessionInterface, msg *ClientMessage) {
 	acc := msg.Acc
 	if acc == nil {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing account data"))
@@ -243,7 +259,7 @@ func (h *Handlers) HandleAcc(s *Session, msg *ClientMessage) {
 	}
 }
 
-func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *ClientMessage, acc *MsgClientAcc) {
+func (h *Handlers) handleCreateAccount(ctx context.Context, s SessionInterface, msg *ClientMessage, acc *MsgClientAcc) {
 	if acc.Scheme != "basic" {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "only basic auth supported for account creation"))
 		return
@@ -350,7 +366,12 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 
 	// If login requested, authenticate
 	if acc.Login {
-		h.hub.AuthenticateSession(s, userID)
+		// Authenticate session (only if hub is available - nil in tests)
+		if h.hub != nil {
+			if sess, ok := s.(*Session); ok {
+				h.hub.AuthenticateSession(sess, userID)
+			}
+		}
 
 		token, expiresAt, err := h.auth.GenerateToken(userID)
 		if err != nil {
@@ -392,7 +413,7 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 	}
 }
 
-func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *ClientMessage, acc *MsgClientAcc) {
+func (h *Handlers) handleUpdateAccount(ctx context.Context, s SessionInterface, msg *ClientMessage, acc *MsgClientAcc) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -467,6 +488,10 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 
 // HandleSearch processes user search requests.
 func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
+	h.handleSearch(s, msg)
+}
+
+func (h *Handlers) handleSearch(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -492,10 +517,14 @@ func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
 		if user.ID == s.UserID() {
 			continue
 		}
+		online := false
+		if h.hub != nil {
+			online = h.hub.IsOnline(user.ID)
+		}
 		results = append(results, map[string]any{
 			"id":       user.ID.String(),
 			"public":   user.Public,
-			"online":   h.hub.IsOnline(user.ID),
+			"online":   online,
 			"lastSeen": user.LastSeen,
 		})
 	}
