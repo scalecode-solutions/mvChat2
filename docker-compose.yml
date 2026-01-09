@@ -53,6 +53,11 @@ services:
       REDIS_ENABLED: "true"
       REDIS_ADDR: redis:6379
       NODE_ID: node1
+      # Security keys - generate new ones for production with: ./mvchat2 --generate-keys
+      UID_KEY: ${UID_KEY:-gAO5YRamft6pviGSQOr8Dg==}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-mFzKYLREV0GpZTB1tky8EG22nNFa7r4qyTLYMb0Kx1I=}
+      API_KEY_SALT: ${API_KEY_SALT:-ROPsFSAWUOUzmhJVMFdJU4cQO6u5mpmh67Yk4ZMF6QA=}
+      TOKEN_KEY: ${TOKEN_KEY:-pyn/SxK8gwZEzVyMKNY1tp0jp2NTaSXiJq5FGOIJp5U=}
     volumes:
       - mvchat2-uploads:/app/uploads
     command: ["-init-db"]
