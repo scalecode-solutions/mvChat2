@@ -222,6 +222,9 @@ export class MVChat2Client {
       case 'read':
         this.emit('read', { conv: info.conv, user: info.from, seq: info.seq });
         break;
+      case 'recv':
+        this.emit('recv', { conv: info.conv, user: info.from, seq: info.seq });
+        break;
       case 'edit':
         this.emit('edit', { conv: info.conv, seq: info.seq, from: info.from, content: info.content });
         break;
@@ -439,6 +442,20 @@ export class MVChat2Client {
     });
   }
 
+  /**
+   * Update the current user's private data.
+   * This data is only visible to the user themselves.
+   * @param privateData - Any JSON-serializable private data
+   */
+  async updatePrivateData(privateData: any): Promise<void> {
+    await this.request({
+      acc: {
+        user: 'me',
+        desc: { private: privateData },
+      },
+    });
+  }
+
   async updateEmail(email: string): Promise<void> {
     await this.request({
       acc: {
@@ -586,6 +603,31 @@ export class MVChat2Client {
   async markRead(convId: string, seq: number): Promise<void> {
     await this.request({
       read: { conv: convId, seq },
+    });
+  }
+
+  /**
+   * Mark messages as received (delivered to device).
+   * This sends a delivery receipt to the conversation.
+   * @param convId - Conversation ID
+   * @param seq - Sequence number of the last received message
+   */
+  async markReceived(convId: string, seq: number): Promise<void> {
+    await this.request({
+      recv: { conv: convId, seq },
+    });
+  }
+
+  /**
+   * Clear conversation history up to a sequence number.
+   * Messages with seq <= the given value will be hidden from this user.
+   * This is a soft delete - other users are not affected.
+   * @param convId - Conversation ID
+   * @param seq - Clear messages up to and including this sequence number
+   */
+  async clearConversation(convId: string, seq: number): Promise<void> {
+    await this.request({
+      clear: { conv: convId, seq },
     });
   }
 

@@ -53,6 +53,8 @@ type Store interface {
 	IsBlocked(ctx context.Context, convID, blockerID, blockedID uuid.UUID) (bool, error)
 	UpdateMemberSettings(ctx context.Context, convID, userID uuid.UUID, settings MemberSettings) error
 	UpdateReadSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error
+	UpdateRecvSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error
+	UpdateClearSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error
 	GetReadReceipts(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error)
 	AddRoomMember(ctx context.Context, convID, userID uuid.UUID, role string) error
 	RemoveMember(ctx context.Context, convID, userID uuid.UUID) error

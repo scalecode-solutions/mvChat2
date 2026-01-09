@@ -389,6 +389,26 @@ func (db *DB) UpdateReadSeq(ctx context.Context, convID, userID uuid.UUID, seq i
 	return err
 }
 
+// UpdateRecvSeq updates a user's received (delivered) sequence number.
+// This indicates the user's device has received messages up to this seq.
+func (db *DB) UpdateRecvSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE members SET recv_seq = GREATEST(recv_seq, $3), updated_at = $4
+		WHERE conversation_id = $1 AND user_id = $2
+	`, convID, userID, seq, time.Now().UTC())
+	return err
+}
+
+// UpdateClearSeq clears conversation history up to seq for a user.
+// Messages with seq <= clearSeq will be hidden for this user.
+func (db *DB) UpdateClearSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE members SET clear_seq = $3, updated_at = $4
+		WHERE conversation_id = $1 AND user_id = $2
+	`, convID, userID, seq, time.Now().UTC())
+	return err
+}
+
 // ReadReceipt represents a user's read status in a conversation.
 type ReadReceipt struct {
 	UserID  uuid.UUID

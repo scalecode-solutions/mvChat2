@@ -260,6 +260,12 @@ export interface ReadEvent {
   seq: number;
 }
 
+export interface RecvEvent {
+  conv: string;
+  user: string;
+  seq: number;
+}
+
 export interface PinEvent {
   conv: string;
   from: string;
@@ -355,6 +361,8 @@ export interface ClientMessage {
   react?: MsgClientReact;
   typing?: MsgClientTyping;
   read?: MsgClientRead;
+  recv?: MsgClientRecv;
+  clear?: MsgClientClear;
   invite?: MsgClientInvite;
   contact?: MsgClientContact;
   pin?: MsgClientPin;
@@ -452,6 +460,16 @@ export interface MsgClientTyping {
 }
 
 export interface MsgClientRead {
+  conv: string;
+  seq: number;
+}
+
+export interface MsgClientRecv {
+  conv: string;
+  seq: number;
+}
+
+export interface MsgClientClear {
   conv: string;
   seq: number;
 }

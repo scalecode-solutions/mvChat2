@@ -295,6 +295,12 @@ func (s *Session) dispatch(msg *ClientMessage) {
 	if msg.Read != nil {
 		typeCount++
 	}
+	if msg.Recv != nil {
+		typeCount++
+	}
+	if msg.Clear != nil {
+		typeCount++
+	}
 	if msg.Invite != nil {
 		typeCount++
 	}
@@ -349,6 +355,10 @@ func (s *Session) dispatch(msg *ClientMessage) {
 		s.handleTyping(msg)
 	case msg.Read != nil:
 		s.handleRead(msg)
+	case msg.Recv != nil:
+		s.handleRecv(msg)
+	case msg.Clear != nil:
+		s.handleClear(msg)
 	case msg.Invite != nil:
 		s.handleInvite(msg)
 	case msg.Contact != nil:
@@ -426,6 +436,14 @@ func (s *Session) handleTyping(msg *ClientMessage) {
 
 func (s *Session) handleRead(msg *ClientMessage) {
 	s.handlers.HandleRead(s, msg)
+}
+
+func (s *Session) handleRecv(msg *ClientMessage) {
+	s.handlers.HandleRecv(s, msg)
+}
+
+func (s *Session) handleClear(msg *ClientMessage) {
+	s.handlers.HandleClear(s, msg)
 }
 
 func (s *Session) handleInvite(msg *ClientMessage) {

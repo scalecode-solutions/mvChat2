@@ -49,6 +49,8 @@ type MockStore struct {
 	IsBlockedFn            func(ctx context.Context, convID, blockerID, blockedID uuid.UUID) (bool, error)
 	UpdateMemberSettingsFn func(ctx context.Context, convID, userID uuid.UUID, settings MemberSettings) error
 	UpdateReadSeqFn        func(ctx context.Context, convID, userID uuid.UUID, seq int) error
+	UpdateRecvSeqFn        func(ctx context.Context, convID, userID uuid.UUID, seq int) error
+	UpdateClearSeqFn       func(ctx context.Context, convID, userID uuid.UUID, seq int) error
 	GetReadReceiptsFn      func(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error)
 	AddRoomMemberFn        func(ctx context.Context, convID, userID uuid.UUID, role string) error
 	RemoveMemberFn         func(ctx context.Context, convID, userID uuid.UUID) error
@@ -321,6 +323,20 @@ func (m *MockStore) UpdateMemberSettings(ctx context.Context, convID, userID uui
 func (m *MockStore) UpdateReadSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error {
 	if m.UpdateReadSeqFn != nil {
 		return m.UpdateReadSeqFn(ctx, convID, userID, seq)
+	}
+	return nil
+}
+
+func (m *MockStore) UpdateRecvSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error {
+	if m.UpdateRecvSeqFn != nil {
+		return m.UpdateRecvSeqFn(ctx, convID, userID, seq)
+	}
+	return nil
+}
+
+func (m *MockStore) UpdateClearSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error {
+	if m.UpdateClearSeqFn != nil {
+		return m.UpdateClearSeqFn(ctx, convID, userID, seq)
 	}
 	return nil
 }

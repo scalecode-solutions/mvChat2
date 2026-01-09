@@ -110,6 +110,17 @@ await client.updateProfile({
 });
 ```
 
+### Update Private Data
+
+```typescript
+// Private data is only visible to you (not shared with other users)
+await client.updatePrivateData({
+  theme: 'dark',
+  notifications: { sound: true, vibrate: false },
+  customData: 'anything JSON-serializable',
+});
+```
+
 ## Conversations
 
 ### Get All Conversations
@@ -306,6 +317,21 @@ await client.react(convId, seq, '👍');
 await client.markRead(convId, seq);
 ```
 
+### Delivery Receipts
+
+```typescript
+// Mark messages as received (delivered to device)
+await client.markReceived(convId, seq);
+```
+
+### Clear Conversation History
+
+```typescript
+// Clear conversation history up to a sequence number
+// This is a soft delete - only affects your view, not other users
+await client.clearConversation(convId, seq);
+```
+
 ## Disappearing Messages
 
 ```typescript
@@ -446,6 +472,11 @@ client.on('react', (event) => {
 
 // Read receipt
 client.on('read', (event) => {
+  // event: { conv, user, seq }
+});
+
+// Delivery receipt
+client.on('recv', (event) => {
   // event: { conv, user, seq }
 });
 

@@ -26,6 +26,8 @@ type ClientMessage struct {
 	React   *MsgClientReact   `json:"react,omitempty"`
 	Typing  *MsgClientTyping  `json:"typing,omitempty"`
 	Read    *MsgClientRead    `json:"read,omitempty"`
+	Recv    *MsgClientRecv    `json:"recv,omitempty"`
+	Clear   *MsgClientClear   `json:"clear,omitempty"`
 	Invite  *MsgClientInvite  `json:"invite,omitempty"`
 	Contact *MsgClientContact `json:"contact,omitempty"`
 	Pin     *MsgClientPin     `json:"pin,omitempty"`
@@ -176,6 +178,18 @@ type MsgClientTyping struct {
 type MsgClientRead struct {
 	ConversationID string `json:"conv"`
 	Seq            int    `json:"seq"`
+}
+
+// MsgClientRecv is the delivery receipt (message received by client).
+type MsgClientRecv struct {
+	ConversationID string `json:"conv"`
+	Seq            int    `json:"seq"`
+}
+
+// MsgClientClear clears conversation history up to a sequence number.
+type MsgClientClear struct {
+	ConversationID string `json:"conv"`
+	Seq            int    `json:"seq"` // Clear messages with seq <= this value
 }
 
 // ============================================================================

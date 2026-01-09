@@ -1191,6 +1191,92 @@ func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 	}, s.ID())
 }
 
+// HandleRecv processes delivery receipt requests.
+func (h *Handlers) HandleRecv(s *Session, msg *ClientMessage) {
+	h.handleRecv(s, msg)
+}
+
+func (h *Handlers) handleRecv(s SessionInterface, msg *ClientMessage) {
+	if !s.RequireAuth(msg.ID) {
+		return
+	}
+
+	recv := msg.Recv
+	if recv == nil || recv.ConversationID == "" || recv.Seq <= 0 {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing recv data"))
+		return
+	}
+
+	ctx, cancel := handlerCtx()
+	defer cancel()
+
+	convID, ok := parseUUID(s, msg.ID, recv.ConversationID, "conv id")
+	if !ok {
+		return
+	}
+
+	// Update recv seq
+	if err := h.db.UpdateRecvSeq(ctx, convID, s.UserID(), recv.Seq); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+
+	// Broadcast to members
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "recv",
+		Seq:            recv.Seq,
+		Ts:             time.Now().UTC(),
+	}, s.ID())
+}
+
+// HandleClear processes clear conversation history requests.
+func (h *Handlers) HandleClear(s *Session, msg *ClientMessage) {
+	h.handleClear(s, msg)
+}
+
+func (h *Handlers) handleClear(s SessionInterface, msg *ClientMessage) {
+	if !s.RequireAuth(msg.ID) {
+		return
+	}
+
+	clear := msg.Clear
+	if clear == nil || clear.ConversationID == "" || clear.Seq <= 0 {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing clear data"))
+		return
+	}
+
+	ctx, cancel := handlerCtx()
+	defer cancel()
+
+	convID, ok := parseUUID(s, msg.ID, clear.ConversationID, "conv id")
+	if !ok {
+		return
+	}
+
+	// Verify user is a member
+	isMember, err := h.db.IsMember(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if !isMember {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+
+	// Update clear seq
+	if err := h.db.UpdateClearSeq(ctx, convID, s.UserID(), clear.Seq); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+}
+
 // HandlePin processes pin/unpin message requests.
 func (h *Handlers) HandlePin(s *Session, msg *ClientMessage) {
 	h.handlePin(s, msg)

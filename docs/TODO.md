@@ -261,8 +261,10 @@ TTL options: 10, 30, 60, 300, 3600, 86400, 604800 seconds (or 0 to disable)
 - [x] Disappearing messages (per-conversation TTL: 10s, 30s, 1m, 5m, 1h, 24h, 7d)
 - [x] View-once messages (sender-controlled TTL, expires after recipient reads)
 - [x] Unsend time limit enforcement (5 minutes)
-- [ ] Delete for everyone (separate from unsend, no time limit)
+- [x] Delete for everyone (separate from unsend, no time limit)
 - [x] Edit limits (10 edits per message within 15 minutes, then locked)
+- [x] Delivery receipts (recv endpoint to track delivered messages)
+- [x] Clear conversation (clear endpoint for per-user history clearing)
 - [ ] Location sharing for emergencies
 - [ ] Pre-recorded distress messages (record when safe, send with one tap when in danger)
 - [ ] Emergency quick-send to all trusted contacts
