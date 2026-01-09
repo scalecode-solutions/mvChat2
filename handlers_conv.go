@@ -143,9 +143,16 @@ func (h *Handlers) handleRoom(s SessionInterface, msg *ClientMessage) {
 	switch room.Action {
 	case "create":
 		h.handleCreateRoom(ctx, s, msg, room)
+	case "invite":
+		h.handleInviteToRoom(ctx, s, msg, room)
+	case "leave":
+		h.handleLeaveRoom(ctx, s, msg, room)
+	case "kick":
+		h.handleKickFromRoom(ctx, s, msg, room)
+	case "update":
+		h.handleUpdateRoom(ctx, s, msg, room)
 	default:
-		// TODO: join, leave, invite, kick, update
-		s.Send(CtrlError(msg.ID, CodeInternalError, "not implemented"))
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown room action"))
 	}
 }
 
@@ -165,6 +172,210 @@ func (h *Handlers) handleCreateRoom(ctx context.Context, s SessionInterface, msg
 		"conv":   conv.ID.String(),
 		"public": conv.Public,
 	}))
+}
+
+func (h *Handlers) handleInviteToRoom(ctx context.Context, s SessionInterface, msg *ClientMessage, room *MsgClientRoom) {
+	convID, ok := parseUUID(s, msg.ID, room.ID, "room id")
+	if !ok {
+		return
+	}
+
+	targetUserID, ok := parseUUID(s, msg.ID, room.User, "user id")
+	if !ok {
+		return
+	}
+
+	// Check requester's role
+	role, err := h.db.GetMemberRole(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if role == "" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+	if role != "owner" && role != "admin" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "only owner or admin can invite"))
+		return
+	}
+
+	// Check target user exists
+	targetUser, err := h.db.GetUserByID(ctx, targetUserID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if targetUser == nil {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "user not found"))
+		return
+	}
+
+	// Add member
+	if err := h.db.AddRoomMember(ctx, convID, targetUserID, "member"); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to add member"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"user":   targetUserID.String(),
+		"public": targetUser.Public,
+	}))
+
+	// Broadcast to members
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "member_joined",
+		Ts:             time.Now().UTC(),
+	}, "")
+}
+
+func (h *Handlers) handleLeaveRoom(ctx context.Context, s SessionInterface, msg *ClientMessage, room *MsgClientRoom) {
+	convID, ok := parseUUID(s, msg.ID, room.ID, "room id")
+	if !ok {
+		return
+	}
+
+	// Check requester's role
+	role, err := h.db.GetMemberRole(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if role == "" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+	if role == "owner" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "owner cannot leave room"))
+		return
+	}
+
+	// Remove member
+	if err := h.db.RemoveMember(ctx, convID, s.UserID()); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to leave room"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+
+	// Broadcast to remaining members
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "member_left",
+		Ts:             time.Now().UTC(),
+	}, s.ID())
+}
+
+func (h *Handlers) handleKickFromRoom(ctx context.Context, s SessionInterface, msg *ClientMessage, room *MsgClientRoom) {
+	convID, ok := parseUUID(s, msg.ID, room.ID, "room id")
+	if !ok {
+		return
+	}
+
+	targetUserID, ok := parseUUID(s, msg.ID, room.User, "user id")
+	if !ok {
+		return
+	}
+
+	// Check requester's role
+	requesterRole, err := h.db.GetMemberRole(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if requesterRole == "" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+	if requesterRole != "owner" && requesterRole != "admin" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "only owner or admin can kick"))
+		return
+	}
+
+	// Check target's role
+	targetRole, err := h.db.GetMemberRole(ctx, convID, targetUserID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if targetRole == "" {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "user not a member"))
+		return
+	}
+	if targetRole == "owner" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "cannot kick owner"))
+		return
+	}
+	// Admin can only kick members, not other admins
+	if requesterRole == "admin" && targetRole == "admin" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "admin cannot kick admin"))
+		return
+	}
+
+	// Remove member
+	if err := h.db.RemoveMember(ctx, convID, targetUserID); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to kick member"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+
+	// Broadcast to all members (including kicked user so their client knows)
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "member_kicked",
+		Ts:             time.Now().UTC(),
+	}, "")
+}
+
+func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg *ClientMessage, room *MsgClientRoom) {
+	convID, ok := parseUUID(s, msg.ID, room.ID, "room id")
+	if !ok {
+		return
+	}
+
+	// Check requester's role
+	role, err := h.db.GetMemberRole(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if role == "" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+	if role != "owner" && role != "admin" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "only owner or admin can update"))
+		return
+	}
+
+	// Get new public data
+	var public json.RawMessage
+	if room.Desc != nil {
+		public = room.Desc.Public
+	}
+
+	if err := h.db.UpdateRoomPublic(ctx, convID, public); err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update room"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"public": public,
+	}))
+
+	// Broadcast to members
+	h.broadcastToConv(ctx, convID, &MsgServerInfo{
+		ConversationID: convID.String(),
+		From:           s.UserID().String(),
+		What:           "room_updated",
+		Content:        public,
+		Ts:             time.Now().UTC(),
+	}, s.ID())
 }
 
 // HandleGet processes get requests (conversations, messages, members).

@@ -423,3 +423,52 @@ func (db *DB) IsBlocked(ctx context.Context, convID, blockerID, blockedID uuid.U
 	}
 	return blocked, err
 }
+
+// AddRoomMember adds a user to a room with the specified role.
+// If the user is already a member (including soft-deleted), this is a no-op.
+func (db *DB) AddRoomMember(ctx context.Context, convID, userID uuid.UUID, role string) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		INSERT INTO members (conversation_id, user_id, created_at, updated_at, role)
+		VALUES ($1, $2, $3, $3, $4)
+		ON CONFLICT (conversation_id, user_id) DO UPDATE SET
+			deleted_at = NULL,
+			role = EXCLUDED.role,
+			updated_at = EXCLUDED.updated_at
+	`, convID, userID, now, role)
+	return err
+}
+
+// RemoveMember soft-deletes a member from a conversation.
+func (db *DB) RemoveMember(ctx context.Context, convID, userID uuid.UUID) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE members SET deleted_at = $3, updated_at = $3
+		WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL
+	`, convID, userID, now)
+	return err
+}
+
+// GetMemberRole returns the role of a member in a conversation.
+// Returns empty string if not a member.
+func (db *DB) GetMemberRole(ctx context.Context, convID, userID uuid.UUID) (string, error) {
+	var role string
+	err := db.pool.QueryRow(ctx, `
+		SELECT role FROM members
+		WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL
+	`, convID, userID).Scan(&role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return role, err
+}
+
+// UpdateRoomPublic updates a room's public metadata.
+func (db *DB) UpdateRoomPublic(ctx context.Context, convID uuid.UUID, public json.RawMessage) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE conversations SET public = $2, updated_at = $3
+		WHERE id = $1 AND type = 'room'
+	`, convID, public, now)
+	return err
+}

@@ -54,6 +54,12 @@ type Store interface {
 	UpdateMemberSettings(ctx context.Context, convID, userID uuid.UUID, settings MemberSettings) error
 	UpdateReadSeq(ctx context.Context, convID, userID uuid.UUID, seq int) error
 	GetReadReceipts(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error)
+	AddRoomMember(ctx context.Context, convID, userID uuid.UUID, role string) error
+	RemoveMember(ctx context.Context, convID, userID uuid.UUID) error
+	GetMemberRole(ctx context.Context, convID, userID uuid.UUID) (string, error)
+
+	// Rooms
+	UpdateRoomPublic(ctx context.Context, convID uuid.UUID, public json.RawMessage) error
 
 	// Messages
 	CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)

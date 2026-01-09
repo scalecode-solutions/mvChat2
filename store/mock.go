@@ -50,6 +50,12 @@ type MockStore struct {
 	UpdateMemberSettingsFn func(ctx context.Context, convID, userID uuid.UUID, settings MemberSettings) error
 	UpdateReadSeqFn        func(ctx context.Context, convID, userID uuid.UUID, seq int) error
 	GetReadReceiptsFn      func(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error)
+	AddRoomMemberFn        func(ctx context.Context, convID, userID uuid.UUID, role string) error
+	RemoveMemberFn         func(ctx context.Context, convID, userID uuid.UUID) error
+	GetMemberRoleFn        func(ctx context.Context, convID, userID uuid.UUID) (string, error)
+
+	// Rooms
+	UpdateRoomPublicFn func(ctx context.Context, convID uuid.UUID, public json.RawMessage) error
 
 	// Messages
 	CreateMessageFn            func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
@@ -308,6 +314,34 @@ func (m *MockStore) GetReadReceipts(ctx context.Context, convID uuid.UUID) ([]Re
 		return m.GetReadReceiptsFn(ctx, convID)
 	}
 	return nil, nil
+}
+
+func (m *MockStore) AddRoomMember(ctx context.Context, convID, userID uuid.UUID, role string) error {
+	if m.AddRoomMemberFn != nil {
+		return m.AddRoomMemberFn(ctx, convID, userID, role)
+	}
+	return nil
+}
+
+func (m *MockStore) RemoveMember(ctx context.Context, convID, userID uuid.UUID) error {
+	if m.RemoveMemberFn != nil {
+		return m.RemoveMemberFn(ctx, convID, userID)
+	}
+	return nil
+}
+
+func (m *MockStore) GetMemberRole(ctx context.Context, convID, userID uuid.UUID) (string, error) {
+	if m.GetMemberRoleFn != nil {
+		return m.GetMemberRoleFn(ctx, convID, userID)
+	}
+	return "member", nil
+}
+
+func (m *MockStore) UpdateRoomPublic(ctx context.Context, convID uuid.UUID, public json.RawMessage) error {
+	if m.UpdateRoomPublicFn != nil {
+		return m.UpdateRoomPublicFn(ctx, convID, public)
+	}
+	return nil
 }
 
 func (m *MockStore) CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error) {
