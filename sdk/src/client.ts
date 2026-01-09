@@ -473,12 +473,35 @@ export class MVChat2Client {
     this._emailVerified = true;
   }
 
+  // Users
+  /**
+   * Get a user's profile by ID.
+   * @param userId - User ID to fetch
+   */
+  async getUser(userId: string): Promise<{ id: string; public: any; online: boolean; lastSeen?: string }> {
+    const ctrl = await this.request({
+      get: { what: 'user', user: userId },
+    });
+    return ctrl.params?.user;
+  }
+
   // Conversations
   async getConversations(): Promise<Conversation[]> {
     const ctrl = await this.request({
       get: { what: 'conversations' },
     });
     return ctrl.params?.conversations || [];
+  }
+
+  /**
+   * Get a single conversation by ID.
+   * @param convId - Conversation ID to fetch
+   */
+  async getConversation(convId: string): Promise<Conversation> {
+    const ctrl = await this.request({
+      get: { what: 'conversation', conv: convId },
+    });
+    return ctrl.params?.conversation;
   }
 
   async startDM(userId: string): Promise<StartDMResult> {

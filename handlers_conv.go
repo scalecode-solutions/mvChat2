@@ -466,6 +466,8 @@ func (h *Handlers) handleGet(s SessionInterface, msg *ClientMessage) {
 	switch get.What {
 	case "conversations":
 		h.handleGetConversations(ctx, s, msg)
+	case "conversation":
+		h.handleGetConversation(ctx, s, msg, get)
 	case "messages":
 		h.handleGetMessages(ctx, s, msg, get)
 	case "members":
@@ -474,6 +476,8 @@ func (h *Handlers) handleGet(s SessionInterface, msg *ClientMessage) {
 		h.handleGetReceipts(ctx, s, msg, get)
 	case "contacts":
 		h.handleGetContacts(ctx, s, msg)
+	case "user":
+		h.handleGetUser(ctx, s, msg, get)
 	default:
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown what"))
 	}
@@ -511,6 +515,117 @@ func (h *Handlers) handleGetContacts(ctx context.Context, s SessionInterface, ms
 
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"contacts": results,
+	}))
+}
+
+func (h *Handlers) handleGetUser(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
+	if get.User == "" {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing user id"))
+		return
+	}
+
+	userID, ok := parseUUID(s, msg.ID, get.User, "user id")
+	if !ok {
+		return
+	}
+
+	user, err := h.db.GetUserByID(ctx, userID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "user not found"))
+		return
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"user": map[string]any{
+			"id":       user.ID.String(),
+			"public":   user.Public,
+			"online":   h.isOnline(user.ID),
+			"lastSeen": user.LastSeen,
+		},
+	}))
+}
+
+func (h *Handlers) handleGetConversation(ctx context.Context, s SessionInterface, msg *ClientMessage, get *MsgClientGet) {
+	if get.ConversationID == "" {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing conv id"))
+		return
+	}
+
+	convID, ok := parseUUID(s, msg.ID, get.ConversationID, "conv id")
+	if !ok {
+		return
+	}
+
+	// Check membership
+	isMember, err := h.db.IsMember(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if !isMember {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+
+	conv, err := h.db.GetConversationByID(ctx, convID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "conversation not found"))
+		return
+	}
+
+	member, _ := h.db.GetMember(ctx, convID, s.UserID())
+
+	item := map[string]any{
+		"id":      conv.ID.String(),
+		"type":    conv.Type,
+		"lastSeq": conv.LastSeq,
+	}
+
+	if member != nil {
+		item["readSeq"] = member.ReadSeq
+		item["unread"] = conv.LastSeq - member.ReadSeq
+		item["favorite"] = member.Favorite
+		item["muted"] = member.Muted
+		if member.Private != nil {
+			item["private"] = member.Private
+		}
+	}
+
+	if conv.LastMsgAt != nil {
+		item["lastMsgAt"] = conv.LastMsgAt
+	}
+
+	if conv.DisappearingTTL != nil {
+		item["disappearingTTL"] = *conv.DisappearingTTL
+	}
+
+	if conv.PinnedMessageID != nil {
+		seq, _ := h.db.GetPinnedMessageSeq(ctx, convID)
+		if seq != nil {
+			item["pinnedSeq"] = *seq
+			item["pinnedAt"] = conv.PinnedAt
+			if conv.PinnedBy != nil {
+				item["pinnedBy"] = conv.PinnedBy.String()
+			}
+		}
+	}
+
+	if conv.Type == "dm" {
+		otherUser, _ := h.db.GetDMOtherUser(ctx, convID, s.UserID())
+		if otherUser != nil {
+			item["user"] = map[string]any{
+				"id":       otherUser.ID.String(),
+				"public":   otherUser.Public,
+				"online":   h.isOnline(otherUser.ID),
+				"lastSeen": otherUser.LastSeen,
+			}
+		}
+	} else if conv.Type == "room" {
+		item["public"] = conv.Public
+	}
+
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conversation": item,
 	}))
 }
 

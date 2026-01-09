@@ -6,3 +6,5 @@ export { useContacts, UseContactsResult } from './useContacts';
 export { useTyping, UseTypingResult } from './useTyping';
 export { useInvites, UseInvitesResult } from './useInvites';
 export { usePresence, UsePresenceResult, UserPresence } from './usePresence';
+export { useMembers, UseMembersResult } from './useMembers';
+export { useReadReceipts, UseReadReceiptsResult } from './useReadReceipts';

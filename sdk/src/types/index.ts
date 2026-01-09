@@ -426,8 +426,9 @@ export interface MsgClientSend {
 }
 
 export interface MsgClientGet {
-  what: 'conversations' | 'messages' | 'members' | 'receipts' | 'contacts';
+  what: 'conversations' | 'conversation' | 'messages' | 'members' | 'receipts' | 'contacts' | 'user';
   conv?: string;
+  user?: string;
   limit?: number;
   before?: number;
 }

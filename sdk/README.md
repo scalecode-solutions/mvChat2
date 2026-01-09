@@ -121,6 +121,16 @@ await client.updatePrivateData({
 });
 ```
 
+## Users
+
+### Get User Profile
+
+```typescript
+// Fetch a user's profile by ID
+const user = await client.getUser('user-id');
+// Returns: { id, public, online, lastSeen }
+```
+
 ## Conversations
 
 ### Get All Conversations
@@ -143,6 +153,13 @@ const conversations = await client.getConversations();
 // - pinnedBy?: string
 // For DMs: user: { id, public, online, lastSeen }
 // For rooms: public: { fn, description, photo }
+```
+
+### Get Single Conversation
+
+```typescript
+// Fetch a single conversation by ID (more efficient than getConversations)
+const conv = await client.getConversation('conv-id');
 ```
 
 ### Start a DM
@@ -751,6 +768,68 @@ function OnlineStatus({ userId }) {
       <Text>{online ? 'Online' : 'Offline'}</Text>
       {!online && presence?.lastSeen && (
         <Text>Last seen: {presence.lastSeen}</Text>
+      )}
+    </View>
+  );
+}
+```
+
+### useMembers
+
+```typescript
+import { useMembers } from '@mvchat/react-native-sdk';
+
+function RoomMembers({ roomId }) {
+  const { members, isLoading, error, refresh } = useMembers(client, roomId);
+
+  // Automatically refreshes when members join/leave/kicked
+  // Automatically updates online status via presence events
+
+  return (
+    <FlatList
+      data={members}
+      renderItem={({ item }) => (
+        <MemberRow
+          name={item.public?.fn}
+          online={item.online}
+          lastSeen={item.lastSeen}
+        />
+      )}
+      refreshing={isLoading}
+      onRefresh={refresh}
+    />
+  );
+}
+```
+
+### useReadReceipts
+
+```typescript
+import { useReadReceipts } from '@mvchat/react-native-sdk';
+
+function MessageStatus({ conversationId, seq }) {
+  const {
+    hasRead,
+    hasReceived,
+    getReadersForSeq,
+    receipts,
+  } = useReadReceipts(client, conversationId);
+
+  // Check if specific user has read
+  const userHasRead = hasRead('user-id', seq);
+
+  // Get all users who read this message
+  const readers = getReadersForSeq(seq);
+
+  // Show delivery/read status
+  return (
+    <View>
+      {readers.length > 0 ? (
+        <Text>Read by {readers.length}</Text>
+      ) : hasReceived('user-id', seq) ? (
+        <Text>Delivered</Text>
+      ) : (
+        <Text>Sent</Text>
       )}
     </View>
   );

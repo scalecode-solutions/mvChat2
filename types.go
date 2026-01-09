@@ -132,10 +132,12 @@ type MsgClientSend struct {
 
 // MsgClientGet is for fetching data.
 type MsgClientGet struct {
-	// What to get: "conversations", "messages", "members"
+	// What to get: "conversations", "conversation", "messages", "members", "receipts", "contacts", "user"
 	What string `json:"what"`
-	// For messages: conversation ID
+	// For messages/members/receipts/conversation: conversation ID
 	ConversationID string `json:"conv,omitempty"`
+	// For user: user ID
+	User string `json:"user,omitempty"`
 	// Pagination
 	Before int `json:"before,omitempty"`
 	Limit  int `json:"limit,omitempty"`
