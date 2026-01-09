@@ -85,20 +85,33 @@ func (db *DB) GetMessages(ctx context.Context, convID, userID uuid.UUID, before,
 		limit = 50
 	}
 
-	query := `
-		SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at
-		FROM messages m
-		LEFT JOIN message_deletions md ON m.id = md.message_id AND md.user_id = $2
-		WHERE m.conversation_id = $1 
-		AND m.seq > $5
-		AND md.message_id IS NULL
-	`
-	args := []any{convID, userID, limit, before, clearSeq}
+	var query string
+	var args []any
 
 	if before > 0 {
-		query += " AND m.seq < $4"
+		query = `
+			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at
+			FROM messages m
+			LEFT JOIN message_deletions md ON m.id = md.message_id AND md.user_id = $2
+			WHERE m.conversation_id = $1 
+			AND m.seq > $5
+			AND m.seq < $4
+			AND md.message_id IS NULL
+			ORDER BY m.seq DESC LIMIT $3
+		`
+		args = []any{convID, userID, limit, before, clearSeq}
+	} else {
+		query = `
+			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at
+			FROM messages m
+			LEFT JOIN message_deletions md ON m.id = md.message_id AND md.user_id = $2
+			WHERE m.conversation_id = $1 
+			AND m.seq > $4
+			AND md.message_id IS NULL
+			ORDER BY m.seq DESC LIMIT $3
+		`
+		args = []any{convID, userID, limit, clearSeq}
 	}
-	query += " ORDER BY m.seq DESC LIMIT $3"
 
 	rows, err := db.pool.Query(ctx, query, args...)
 	if err != nil {
