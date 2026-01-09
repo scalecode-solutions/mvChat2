@@ -14,7 +14,7 @@ Most critical and high-priority security issues have been resolved. The codebase
 |----------|----------|----------|-----------|
 | Security (Critical) | 3 | 3 | 0 |
 | Security (High) | 5 | 5 | 0 |
-| Security (Medium) | 6 | 5 | 1 |
+| Security (Medium) | 6 | 6 | 0 |
 | Database (Critical) | 2 | 2 | 0 |
 | Database (High) | 4 | 4 | 0 |
 | WebSocket (Critical) | 3 | 3 | 0 |
@@ -89,6 +89,29 @@ Most critical and high-priority security issues have been resolved. The codebase
 | Hub lock released early | FIXED | GetUserSessions/SendToUser copy slices before unlock |
 | Silent WriteJSON errors | FIXED | Added logging for WebSocket write failures |
 | Redis errors silently ignored | FIXED | Added logging for SetOnline/SetOffline/RefreshOnline |
+| Security headers | FIXED | Handled by Caddy (see below) |
+
+### Caddy Security Configuration
+
+Security headers are configured at the Caddy reverse proxy level in `/etc/caddy/Caddyfile`:
+
+```
+(security_headers) {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+}
+```
+
+Applied to all mvChat domains (api.mvchat.app, chat.mvchat.app, test.mvchat.app, api2.mvchat.app).
+
+Also configured:
+- Rate limiting: 100 req/min API, 10 req/min auth
+- CORS headers for chat.mvchat.app
 
 ## Remaining Issues
 
@@ -101,7 +124,6 @@ None - all high priority issues have been resolved.
 | Issue | File | Notes |
 |-------|------|-------|
 | Sensitive data in logs | various | PII in error messages |
-| Missing security headers | - | Handled by Caddy, but app could add them |
 | Reaction race condition | store/messages.go | Non-atomic JSONB update |
 
 ### Low Priority
