@@ -90,6 +90,7 @@ Most critical and high-priority security issues have been resolved. The codebase
 | Silent WriteJSON errors | FIXED | Added logging for WebSocket write failures |
 | Redis errors silently ignored | FIXED | Added logging for SetOnline/SetOffline/RefreshOnline |
 | Security headers | FIXED | Handled by Caddy (see below) |
+| Reaction race condition | FIXED | SELECT FOR UPDATE in transaction for atomic JSONB update |
 
 ### Caddy Security Configuration
 
@@ -124,7 +125,6 @@ None - all high priority issues have been resolved.
 | Issue | File | Notes |
 |-------|------|-------|
 | Sensitive data in logs | various | PII in error messages |
-| Reaction race condition | store/messages.go | Non-atomic JSONB update |
 
 ### Low Priority
 
