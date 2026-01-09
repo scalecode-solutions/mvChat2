@@ -248,8 +248,17 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 	// In this case, they must change their password after login
 	mustChangePassword := acc.InviteCode != "" && password == acc.InviteCode
 
-	// Create user
-	userID, err := h.db.CreateUserWithOptions(ctx, public, mustChangePassword)
+	// If invite code provided, look up the invite to get the email
+	var userEmail *string
+	if acc.InviteCode != "" {
+		invite, _ := h.db.GetInviteByCode(ctx, acc.InviteCode)
+		if invite != nil {
+			userEmail = &invite.Email
+		}
+	}
+
+	// Create user with email from invite (if available)
+	userID, err := h.db.CreateUserWithOptions(ctx, public, mustChangePassword, userEmail)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create user"))
 		return
@@ -270,8 +279,8 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 
 	// If invite code provided, redeem it (creates DMs and contacts with inviters)
 	var connectedInviters []string
-	if acc.InviteCode != "" {
-		inviters, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID, username)
+	if acc.InviteCode != "" && userEmail != nil {
+		inviters, err := h.RedeemInviteCode(ctx, acc.InviteCode, userID, *userEmail)
 		if err != nil {
 			// Log but don't fail account creation
 		}
@@ -390,6 +399,14 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 		// Clear the must_change_password flag since user has now changed their password
 		if err := h.db.ClearMustChangePassword(ctx, s.userID); err != nil {
 			// Log but don't fail - password was successfully changed
+		}
+	}
+
+	// Update email if provided
+	if acc.Email != nil {
+		if err := h.db.UpdateUserEmail(ctx, s.userID, acc.Email); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update email"))
+			return
 		}
 	}
 

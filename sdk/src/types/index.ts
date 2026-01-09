@@ -271,6 +271,7 @@ export interface MsgClientAcc {
   login?: boolean;
   desc?: { public?: any; private?: any };
   inviteCode?: string;
+  email?: string;
 }
 
 export interface MsgClientSearch {

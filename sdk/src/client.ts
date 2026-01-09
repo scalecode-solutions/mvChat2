@@ -402,6 +402,15 @@ export class MVChat2Client {
     });
   }
 
+  async updateEmail(email: string): Promise<void> {
+    await this.request({
+      acc: {
+        user: 'me',
+        email,
+      },
+    });
+  }
+
   logout(): void {
     this._userID = null;
     this._token = null;

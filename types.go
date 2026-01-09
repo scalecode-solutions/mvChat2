@@ -70,6 +70,8 @@ type MsgClientAcc struct {
 	Desc   *MsgSetDesc `json:"desc,omitempty"`
 	// For invite-based signup: the 10-digit invite code
 	InviteCode string `json:"inviteCode,omitempty"`
+	// For account update: new email address
+	Email *string `json:"email,omitempty"`
 }
 
 // MsgSetDesc is public/private data for account or conversation.

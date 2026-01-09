@@ -20,6 +20,7 @@ type User struct {
 	LastSeen           *time.Time      `json:"lastSeen,omitempty"`
 	UserAgent          string          `json:"userAgent,omitempty"`
 	MustChangePassword bool            `json:"mustChangePassword,omitempty"`
+	Email              *string         `json:"email,omitempty"`
 }
 
 // AuthRecord represents an authentication record.
@@ -35,18 +36,18 @@ type AuthRecord struct {
 
 // CreateUser creates a new user and returns the user ID.
 func (db *DB) CreateUser(ctx context.Context, public json.RawMessage) (uuid.UUID, error) {
-	return db.CreateUserWithOptions(ctx, public, false)
+	return db.CreateUserWithOptions(ctx, public, false, nil)
 }
 
 // CreateUserWithOptions creates a new user with additional options.
-func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage, mustChangePassword bool) (uuid.UUID, error) {
+func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage, mustChangePassword bool, email *string) (uuid.UUID, error) {
 	id := uuid.New()
 	now := time.Now().UTC()
 
 	_, err := db.pool.Exec(ctx, `
-		INSERT INTO users (id, created_at, updated_at, state, public, must_change_password)
-		VALUES ($1, $2, $3, 'ok', $4, $5)
-	`, id, now, now, public, mustChangePassword)
+		INSERT INTO users (id, created_at, updated_at, state, public, must_change_password, email)
+		VALUES ($1, $2, $3, 'ok', $4, $5, $6)
+	`, id, now, now, public, mustChangePassword, email)
 
 	if err != nil {
 		return uuid.Nil, err
@@ -58,9 +59,9 @@ func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage,
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var user User
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
 		FROM users WHERE id = $1 AND state != 'deleted'
-	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword)
+	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -149,6 +150,32 @@ func (db *DB) ClearMustChangePassword(ctx context.Context, userID uuid.UUID) err
 	return err
 }
 
+// UpdateUserEmail updates the user's email address.
+func (db *DB) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email *string) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE users SET email = $2, updated_at = $3
+		WHERE id = $1
+	`, userID, email, time.Now().UTC())
+	return err
+}
+
+// GetUserByEmail retrieves a user by email address.
+func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	var user User
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
+		FROM users WHERE email = $1 AND state != 'deleted'
+	`, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // GetAuthByUserID retrieves the basic auth record for a user.
 func (db *DB) GetAuthByUserID(ctx context.Context, userID uuid.UUID) (*AuthRecord, error) {
 	var auth AuthRecord
@@ -186,7 +213,7 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	}
 
 	rows, err := db.pool.Query(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
 		FROM users
 		WHERE state = 'ok'
 		AND public->>'fn' ILIKE '%' || $1 || '%'
@@ -201,7 +228,7 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	var users []User
 	for rows.Next() {
 		var user User
-		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword); err != nil {
+		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
