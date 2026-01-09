@@ -120,8 +120,8 @@ func (fh *FileHandlers) handleUpload(w http.ResponseWriter, r *http.Request) {
 		// Mark as ready immediately (no processing needed)
 		fh.db.UpdateFileStatus(r.Context(), fileRecord.ID, "ready")
 	} else {
-		// NEW FILE: Create record and process
-		fileRecord, err = fh.db.CreateFileWithHash(r.Context(), userID, mimeType, size, path, hash, header.Filename)
+		// NEW FILE: Create record with same ID as the file on disk
+		fileRecord, err = fh.db.CreateFileWithID(r.Context(), fileID, userID, mimeType, size, path, hash, header.Filename)
 		if err != nil {
 			fh.processor.DeleteFile(fileID, mimeType)
 			http.Error(w, "failed to create file record", http.StatusInternalServerError)

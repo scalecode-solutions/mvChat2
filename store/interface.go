@@ -69,6 +69,7 @@ type Store interface {
 	// Files
 	CreateFile(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
 	CreateFileWithHash(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
+	CreateFileWithID(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
 	GetFileByID(ctx context.Context, id uuid.UUID) (*File, error)
 	GetFileByHash(ctx context.Context, hash string) (*File, error)
 	GetFileWithMetadata(ctx context.Context, id uuid.UUID) (*FileWithMetadata, error)

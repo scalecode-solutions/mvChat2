@@ -48,7 +48,11 @@ func (db *DB) CreateFile(ctx context.Context, uploaderID uuid.UUID, mimeType str
 
 // CreateFileWithHash creates a new file record with hash and original name for deduplication.
 func (db *DB) CreateFileWithHash(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error) {
-	id := uuid.New()
+	return db.CreateFileWithID(ctx, uuid.New(), uploaderID, mimeType, size, location, hash, originalName)
+}
+
+// CreateFileWithID creates a new file record with a specific ID (used when file is already saved to disk with that ID).
+func (db *DB) CreateFileWithID(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error) {
 	now := time.Now().UTC()
 
 	var hashPtr, namePtr *string
@@ -62,14 +66,14 @@ func (db *DB) CreateFileWithHash(ctx context.Context, uploaderID uuid.UUID, mime
 	_, err := db.pool.Exec(ctx, `
 		INSERT INTO files (id, created_at, updated_at, uploader_id, status, mime_type, size, location, hash, original_name)
 		VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)
-	`, id, now, now, uploaderID, mimeType, size, location, hashPtr, namePtr)
+	`, fileID, now, now, uploaderID, mimeType, size, location, hashPtr, namePtr)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &File{
-		ID:           id,
+		ID:           fileID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 		UploaderID:   uploaderID,

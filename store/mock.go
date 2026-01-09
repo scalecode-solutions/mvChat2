@@ -65,6 +65,7 @@ type MockStore struct {
 	// Files
 	CreateFileFn           func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
 	CreateFileWithHashFn   func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
+	CreateFileWithIDFn     func(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
 	GetFileByIDFn          func(ctx context.Context, id uuid.UUID) (*File, error)
 	GetFileByHashFn        func(ctx context.Context, hash string) (*File, error)
 	GetFileWithMetadataFn  func(ctx context.Context, id uuid.UUID) (*FileWithMetadata, error)
@@ -384,6 +385,13 @@ func (m *MockStore) CreateFileWithHash(ctx context.Context, uploaderID uuid.UUID
 		return m.CreateFileWithHashFn(ctx, uploaderID, mimeType, size, location, hash, originalName)
 	}
 	return &File{ID: uuid.New(), UploaderID: uploaderID, MimeType: mimeType, Size: size}, nil
+}
+
+func (m *MockStore) CreateFileWithID(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error) {
+	if m.CreateFileWithIDFn != nil {
+		return m.CreateFileWithIDFn(ctx, fileID, uploaderID, mimeType, size, location, hash, originalName)
+	}
+	return &File{ID: fileID, UploaderID: uploaderID, MimeType: mimeType, Size: size}, nil
 }
 
 func (m *MockStore) GetFileByID(ctx context.Context, id uuid.UUID) (*File, error) {
