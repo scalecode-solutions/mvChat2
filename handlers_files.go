@@ -39,8 +39,9 @@ func NewFileHandlers(db *store.DB, processor *media.Processor, auth AuthValidato
 
 // SetupRoutes adds file routes to the mux.
 func (fh *FileHandlers) SetupRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/v0/file/upload", fh.handleUpload)
-	mux.HandleFunc("/v0/file/", fh.handleDownload)
+	mux.HandleFunc("POST /v0/file/upload", fh.handleUpload)
+	mux.HandleFunc("GET /v0/file/{id}", fh.handleDownload)
+	mux.HandleFunc("GET /v0/file/{id}/thumb", fh.handleDownload)
 }
 
 // handleUpload handles file uploads with content-based deduplication.
@@ -187,27 +188,21 @@ func (fh *FileHandlers) processMedia(fileID uuid.UUID, path, mimeType string) {
 
 // handleDownload handles file downloads.
 func (fh *FileHandlers) handleDownload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract file ID from path: /v0/file/{id}
-	path := strings.TrimPrefix(r.URL.Path, "/v0/file/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 || parts[0] == "" {
+	// Extract file ID from path value (Go 1.22+ routing)
+	idStr := r.PathValue("id")
+	if idStr == "" {
 		http.Error(w, "missing file id", http.StatusBadRequest)
 		return
 	}
 
-	fileID, err := uuid.Parse(parts[0])
+	fileID, err := uuid.Parse(idStr)
 	if err != nil {
 		http.Error(w, "invalid file id", http.StatusBadRequest)
 		return
 	}
 
-	// Check if requesting thumbnail
-	isThumbnail := len(parts) > 1 && parts[1] == "thumb"
+	// Check if requesting thumbnail (path ends with /thumb)
+	isThumbnail := strings.HasSuffix(r.URL.Path, "/thumb")
 
 	// Authenticate
 	userID, err := fh.authenticateRequest(r)
