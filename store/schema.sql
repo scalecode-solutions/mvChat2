@@ -22,7 +22,7 @@ CREATE TABLE users (
     
     -- Last activity tracking
     last_seen TIMESTAMPTZ,
-    user_agent VARCHAR(255),
+    user_agent VARCHAR(255) NOT NULL DEFAULT '',
 
     -- Temporary password flag (user must change password on next login)
     must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
