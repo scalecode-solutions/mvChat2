@@ -251,6 +251,72 @@ func (s *Session) writePump() {
 
 // dispatch routes a client message to the appropriate handler.
 func (s *Session) dispatch(msg *ClientMessage) {
+	// Validate exactly one message type is set
+	typeCount := 0
+	if msg.Hi != nil {
+		typeCount++
+	}
+	if msg.Login != nil {
+		typeCount++
+	}
+	if msg.Acc != nil {
+		typeCount++
+	}
+	if msg.Search != nil {
+		typeCount++
+	}
+	if msg.DM != nil {
+		typeCount++
+	}
+	if msg.Room != nil {
+		typeCount++
+	}
+	if msg.Send != nil {
+		typeCount++
+	}
+	if msg.Get != nil {
+		typeCount++
+	}
+	if msg.Edit != nil {
+		typeCount++
+	}
+	if msg.Unsend != nil {
+		typeCount++
+	}
+	if msg.Delete != nil {
+		typeCount++
+	}
+	if msg.React != nil {
+		typeCount++
+	}
+	if msg.Typing != nil {
+		typeCount++
+	}
+	if msg.Read != nil {
+		typeCount++
+	}
+	if msg.Invite != nil {
+		typeCount++
+	}
+	if msg.Contact != nil {
+		typeCount++
+	}
+
+	if typeCount == 0 {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing message type"))
+		return
+	}
+	if typeCount > 1 {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "exactly one message type required"))
+		return
+	}
+
+	// Require message ID for stateful operations (all except typing which is fire-and-forget)
+	if msg.ID == "" && msg.Typing == nil {
+		s.Send(CtrlError("", CodeBadRequest, "message id required"))
+		return
+	}
+
 	switch {
 	case msg.Hi != nil:
 		s.handleHi(msg)
@@ -284,8 +350,6 @@ func (s *Session) dispatch(msg *ClientMessage) {
 		s.handleInvite(msg)
 	case msg.Contact != nil:
 		s.handleContact(msg)
-	default:
-		s.Send(CtrlError(msg.ID, CodeBadRequest, "unknown message type"))
 	}
 }
 

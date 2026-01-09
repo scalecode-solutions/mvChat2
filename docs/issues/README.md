@@ -72,15 +72,19 @@ Most critical and high-priority security issues have been resolved. The codebase
 | N+1 query in GetUserConversations | FIXED | Single query with LEFT JOINs for DM other user |
 | AddContact transaction | FIXED | Already uses transaction (docs were outdated) |
 
+### Protocol Hardening
+
+| Issue | Status | Resolution |
+|-------|--------|------------|
+| Message ID validation | FIXED | dispatch() requires ID for all ops except typing |
+| Multiple message types validation | FIXED | dispatch() validates exactly one type per request |
+| Connection leak on channel full | FIXED | Register/Unregister use non-blocking sends with goroutine fallback |
+
 ## Remaining Issues
 
 ### High Priority
 
-| Issue | File | Notes |
-|-------|------|-------|
-| Message ID validation | session.go | Protocol - should require ID for stateful ops |
-| Multiple message types validation | session.go | Protocol - should validate exactly one type |
-| Connection leak on channel full | hub.go | Resource management |
+None - all high priority issues have been resolved.
 
 ### Medium Priority
 

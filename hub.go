@@ -111,13 +111,26 @@ func (h *Hub) PublishToUser(ctx context.Context, userID uuid.UUID, msg *ServerMe
 }
 
 // Register adds a session to the hub.
+// Non-blocking: if buffer is full, spawns goroutine to retry.
 func (h *Hub) Register(sess *Session) {
-	h.register <- sess
+	select {
+	case h.register <- sess:
+	default:
+		// Buffer full - spawn goroutine to avoid blocking caller
+		go func() { h.register <- sess }()
+	}
 }
 
 // Unregister removes a session from the hub.
+// Non-blocking: if buffer is full, spawns goroutine to retry.
+// This prevents connection leaks when sessions can't unregister.
 func (h *Hub) Unregister(sess *Session) {
-	h.unregister <- sess
+	select {
+	case h.unregister <- sess:
+	default:
+		// Buffer full - spawn goroutine to avoid blocking caller
+		go func() { h.unregister <- sess }()
+	}
 }
 
 func (h *Hub) addSession(sess *Session) {
