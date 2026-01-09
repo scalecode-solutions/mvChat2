@@ -17,6 +17,10 @@ import {
   SendMessageOptions,
   Irido,
   MVChat2Error,
+  Invite,
+  SearchResult,
+  StartDMResult,
+  CreateRoomResult,
 } from './types';
 
 type EventCallback = (...args: any[]) => void;
@@ -237,6 +241,18 @@ export class MVChat2Client {
       case 'disappearing_updated':
         this.emit('disappearingUpdated', { conv: info.conv, from: info.from });
         break;
+      case 'member_joined':
+        this.emit('memberJoined', { conv: info.conv, from: info.from });
+        break;
+      case 'member_left':
+        this.emit('memberLeft', { conv: info.conv, from: info.from });
+        break;
+      case 'member_kicked':
+        this.emit('memberKicked', { conv: info.conv, from: info.from });
+        break;
+      case 'room_updated':
+        this.emit('roomUpdated', { conv: info.conv, from: info.from, content: info.content });
+        break;
     }
   }
 
@@ -446,17 +462,18 @@ export class MVChat2Client {
     return ctrl.params?.conversations || [];
   }
 
-  async startDM(userId: string): Promise<{ conv: string; created: boolean }> {
+  async startDM(userId: string): Promise<StartDMResult> {
     const ctrl = await this.request({
       dm: { user: userId },
     });
     return {
       conv: ctrl.params?.conv,
       created: ctrl.params?.created,
+      user: ctrl.params?.user,
     };
   }
 
-  async createRoom(options: { public: any }): Promise<{ conv: string }> {
+  async createRoom(options: { public: any }): Promise<CreateRoomResult> {
     const ctrl = await this.request({
       room: {
         id: 'new',
@@ -464,7 +481,10 @@ export class MVChat2Client {
         desc: { public: options.public },
       },
     });
-    return { conv: ctrl.params?.conv };
+    return {
+      conv: ctrl.params?.conv,
+      public: ctrl.params?.public,
+    };
   }
 
   async getMembers(convId: string): Promise<Member[]> {
@@ -594,7 +614,7 @@ export class MVChat2Client {
   }
 
   // Search
-  async searchUsers(query: string, limit?: number): Promise<User[]> {
+  async searchUsers(query: string, limit?: number): Promise<SearchResult[]> {
     const ctrl = await this.request({
       search: { query, limit },
     });
@@ -602,17 +622,18 @@ export class MVChat2Client {
   }
 
   // Invites
-  async createInvite(email: string, name?: string): Promise<{ id: string; code: string }> {
+  async createInvite(email: string, name?: string): Promise<{ id: string; code: string; expiresAt: string }> {
     const ctrl = await this.request({
       invite: { create: { email, name } },
     });
     return {
       id: ctrl.params?.id,
       code: ctrl.params?.code,
+      expiresAt: ctrl.params?.expiresAt,
     };
   }
 
-  async listInvites(): Promise<any[]> {
+  async listInvites(): Promise<Invite[]> {
     const ctrl = await this.request({
       invite: { list: true },
     });
@@ -697,5 +718,77 @@ export class MVChat2Client {
         blocked: options.blocked,
       },
     });
+  }
+
+  // File upload/download (HTTP API)
+  // Note: These use HTTP endpoints, not WebSocket
+
+  /**
+   * Get the base URL for HTTP file operations.
+   * Converts ws:// to http:// or wss:// to https://
+   */
+  private getHttpBaseUrl(): string {
+    return this.config.url
+      .replace(/^ws:\/\//, 'http://')
+      .replace(/^wss:\/\//, 'https://')
+      .replace(/\/v0\/channels$/, ''); // Remove WebSocket path
+  }
+
+  /**
+   * Upload a file. Returns file info including the ref to use in messages.
+   * @param file - File blob to upload
+   * @param filename - Original filename
+   */
+  async uploadFile(file: Blob, filename: string): Promise<{ id: string; mime: string; size: number; deduplicated: boolean }> {
+    if (!this._token) {
+      throw new MVChat2Error(401, 'Not authenticated');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file, filename);
+
+    const response = await fetch(`${this.getHttpBaseUrl()}/v0/file/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this._token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new MVChat2Error(response.status, await response.text());
+    }
+
+    return response.json() as Promise<{ id: string; mime: string; size: number; deduplicated: boolean }>;
+  }
+
+  /**
+   * Get the URL for downloading a file.
+   * @param fileId - File ID (ref from message media)
+   * @param thumbnail - If true, get thumbnail URL instead
+   */
+  getFileUrl(fileId: string, thumbnail: boolean = false): string {
+    const path = thumbnail ? `${fileId}/thumb` : fileId;
+    return `${this.getHttpBaseUrl()}/v0/file/${path}?token=${this._token}`;
+  }
+
+  /**
+   * Download a file as a blob.
+   * @param fileId - File ID
+   * @param thumbnail - If true, download thumbnail instead
+   */
+  async downloadFile(fileId: string, thumbnail: boolean = false): Promise<Blob> {
+    if (!this._token) {
+      throw new MVChat2Error(401, 'Not authenticated');
+    }
+
+    const url = this.getFileUrl(fileId, thumbnail);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new MVChat2Error(response.status, await response.text());
+    }
+
+    return response.blob();
   }
 }

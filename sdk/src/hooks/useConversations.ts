@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MVChat2Client } from '../client';
-import { Conversation } from '../types';
+import { Conversation, StartDMResult, CreateRoomResult } from '../types';
 
 export interface UseConversationsResult {
   conversations: Conversation[];
   isLoading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
-  startDM: (userId: string) => Promise<{ conv: string; created: boolean }>;
-  createRoom: (options: { public: any }) => Promise<{ conv: string }>;
+  startDM: (userId: string) => Promise<StartDMResult>;
+  createRoom: (options: { public: any }) => Promise<CreateRoomResult>;
   // Room management
   inviteToRoom: (roomId: string, userId: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
@@ -48,18 +48,24 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
 
   // Listen for events that affect conversation state
   useEffect(() => {
-    const handlePin = () => refresh();
-    const handleUnpin = () => refresh();
-    const handleDisappearingUpdated = () => refresh();
+    const handleRefresh = () => refresh();
 
-    client.on('pin', handlePin);
-    client.on('unpin', handleUnpin);
-    client.on('disappearingUpdated', handleDisappearingUpdated);
+    client.on('pin', handleRefresh);
+    client.on('unpin', handleRefresh);
+    client.on('disappearingUpdated', handleRefresh);
+    client.on('memberJoined', handleRefresh);
+    client.on('memberLeft', handleRefresh);
+    client.on('memberKicked', handleRefresh);
+    client.on('roomUpdated', handleRefresh);
 
     return () => {
-      client.off('pin', handlePin);
-      client.off('unpin', handleUnpin);
-      client.off('disappearingUpdated', handleDisappearingUpdated);
+      client.off('pin', handleRefresh);
+      client.off('unpin', handleRefresh);
+      client.off('disappearingUpdated', handleRefresh);
+      client.off('memberJoined', handleRefresh);
+      client.off('memberLeft', handleRefresh);
+      client.off('memberKicked', handleRefresh);
+      client.off('roomUpdated', handleRefresh);
     };
   }, [client, refresh]);
 

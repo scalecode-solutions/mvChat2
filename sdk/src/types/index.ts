@@ -93,11 +93,18 @@ export interface ConversationPublic {
   [key: string]: any;
 }
 
+// Member info returned from getMembers - note: backend doesn't return role/joinedAt currently
 export interface Member {
-  userId: string;
-  role: 'owner' | 'admin' | 'member';
-  joinedAt: string;
+  id: string;
   public: UserPublic;
+  online: boolean;
+  lastSeen?: string;
+}
+
+// Full member info with role (for future use when backend supports it)
+export interface RoomMember extends Member {
+  role?: 'owner' | 'admin' | 'member';
+  joinedAt?: string;
 }
 
 export interface ReadReceipt {
@@ -261,6 +268,68 @@ export interface UnpinEvent {
 export interface DisappearingUpdatedEvent {
   conv: string;
   from: string;
+}
+
+// Room management events
+export interface MemberJoinedEvent {
+  conv: string;
+  from: string;
+}
+
+export interface MemberLeftEvent {
+  conv: string;
+  from: string;
+}
+
+export interface MemberKickedEvent {
+  conv: string;
+  from: string;
+}
+
+export interface RoomUpdatedEvent {
+  conv: string;
+  from: string;
+  content?: any;
+}
+
+// Invite types
+export type InviteStatus = 'pending' | 'used' | 'expired' | 'revoked';
+
+export interface Invite {
+  id: string;
+  email: string;
+  name?: string;
+  code?: string;
+  status: InviteStatus;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+  usedBy?: string;
+}
+
+// Search result (simplified user info)
+export interface SearchResult {
+  id: string;
+  public: UserPublic;
+  online: boolean;
+  lastSeen?: string;
+}
+
+// DM start result
+export interface StartDMResult {
+  conv: string;
+  created: boolean;
+  user: {
+    id: string;
+    public: UserPublic;
+    online: boolean;
+  };
+}
+
+// Room create result
+export interface CreateRoomResult {
+  conv: string;
+  public?: any;
 }
 
 // Wire protocol types
