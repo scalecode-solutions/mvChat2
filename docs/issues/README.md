@@ -60,9 +60,17 @@ Most critical and high-priority security issues have been resolved. The codebase
 |---------|--------|---------|
 | must_change_password flag | ADDED | Users signing up with invite code as password are flagged |
 | Email on user account | ADDED | Email stored from invite, updateable via acc message |
+| Email verification | ADDED | Optional verification (disabled by default for DV safety) |
 | Password change endpoint | ADDED | Via acc message with secret field |
 | Unsend time limit | ADDED | 5 minute window |
 | Edit limits | ADDED | 10 edits per message within 15 minutes |
+
+### Performance Fixes
+
+| Issue | Status | Resolution |
+|-------|--------|------------|
+| N+1 query in GetUserConversations | FIXED | Single query with LEFT JOINs for DM other user |
+| AddContact transaction | FIXED | Already uses transaction (docs were outdated) |
 
 ## Remaining Issues
 
@@ -70,8 +78,6 @@ Most critical and high-priority security issues have been resolved. The codebase
 
 | Issue | File | Notes |
 |-------|------|-------|
-| N+1 query in GetUserConversations | store/conversations.go | Performance - refactor with JOIN |
-| Missing transaction in AddContact | store/contacts.go | Data integrity risk |
 | Message ID validation | session.go | Protocol - should require ID for stateful ops |
 | Multiple message types validation | session.go | Protocol - should validate exactly one type |
 | Connection leak on channel full | hub.go | Resource management |
@@ -125,7 +131,7 @@ Most critical and high-priority security issues have been resolved. The codebase
 
 1. **Testing Infrastructure** - Add store interface, unit tests for auth/crypto
 2. **File Deduplication** - Implement hash calculation on upload
-3. **Performance** - Fix N+1 query in GetUserConversations
+3. **Protocol Hardening** - Message ID validation, single message type validation
 4. **Code Quality** - Refactor duplicated patterns
 5. **Documentation** - Add godoc to exported types
 
@@ -139,3 +145,4 @@ Most critical and high-priority security issues have been resolved. The codebase
 | 005 | Add missing indexes |
 | 006 | Add must_change_password to users |
 | 007 | Add email to users |
+| 008 | Add email verification fields |

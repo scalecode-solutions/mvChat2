@@ -213,12 +213,24 @@ func (db *DB) GetMember(ctx context.Context, convID, userID uuid.UUID) (*Member,
 }
 
 // GetUserConversations retrieves all conversations for a user.
+// Uses a single query with JOINs to avoid N+1 queries for DM other user info.
 func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]ConversationWithMember, error) {
+	// Single query that LEFT JOINs dm_participants and users to get DM other user info
 	rows, err := db.pool.Query(ctx, `
-		SELECT c.id, c.created_at, c.updated_at, c.type, c.owner_id, c.public, c.last_seq, c.last_msg_at, c.del_id,
-			m.created_at, m.updated_at, m.role, m.read_seq, m.recv_seq, m.clear_seq, m.favorite, m.muted, m.blocked, m.private
+		SELECT
+			c.id, c.created_at, c.updated_at, c.type, c.owner_id, c.public, c.last_seq, c.last_msg_at, c.del_id,
+			m.created_at, m.updated_at, m.role, m.read_seq, m.recv_seq, m.clear_seq, m.favorite, m.muted, m.blocked, m.private,
+			-- DM other user fields (NULL for rooms)
+			ou.id, ou.created_at, ou.updated_at, ou.state, ou.public, ou.last_seen, ou.user_agent,
+			ou.must_change_password, ou.email, ou.email_verified
 		FROM conversations c
 		JOIN members m ON c.id = m.conversation_id
+		-- LEFT JOIN to get other user for DMs
+		LEFT JOIN dm_participants dp ON c.id = dp.conversation_id AND c.type = 'dm'
+		LEFT JOIN users ou ON ou.id = CASE
+			WHEN dp.user1_id = $1 THEN dp.user2_id
+			ELSE dp.user1_id
+		END AND ou.state != 'deleted'
 		WHERE m.user_id = $1 AND m.deleted_at IS NULL
 		ORDER BY COALESCE(c.last_msg_at, c.created_at) DESC
 	`, userID)
@@ -230,6 +242,20 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 	var results []ConversationWithMember
 	for rows.Next() {
 		var cwm ConversationWithMember
+		// For the other user, use pointer types to handle NULLs from LEFT JOIN
+		var (
+			ouID                 *uuid.UUID
+			ouCreatedAt          *time.Time
+			ouUpdatedAt          *time.Time
+			ouState              *string
+			ouPublic             []byte
+			ouLastSeen           *time.Time
+			ouUserAgent          *string
+			ouMustChangePassword *bool
+			ouEmail              *string
+			ouEmailVerified      *bool
+		)
+
 		if err := rows.Scan(
 			&cwm.Conversation.ID, &cwm.Conversation.CreatedAt, &cwm.Conversation.UpdatedAt,
 			&cwm.Conversation.Type, &cwm.Conversation.OwnerID, &cwm.Conversation.Public,
@@ -237,20 +263,38 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 			&cwm.MemberCreatedAt, &cwm.MemberUpdatedAt, &cwm.Role,
 			&cwm.ReadSeq, &cwm.RecvSeq, &cwm.ClearSeq,
 			&cwm.Favorite, &cwm.Muted, &cwm.Blocked, &cwm.Private,
+			// Other user fields (nullable)
+			&ouID, &ouCreatedAt, &ouUpdatedAt, &ouState, &ouPublic,
+			&ouLastSeen, &ouUserAgent, &ouMustChangePassword, &ouEmail, &ouEmailVerified,
 		); err != nil {
 			return nil, err
 		}
-		results = append(results, cwm)
-	}
 
-	// For DMs, fetch the other user's info
-	for i := range results {
-		if results[i].Type == "dm" {
-			otherUser, err := db.GetDMOtherUser(ctx, results[i].Conversation.ID, userID)
-			if err == nil && otherUser != nil {
-				results[i].OtherUser = otherUser
+		// If this is a DM and we have other user data, populate OtherUser
+		if cwm.Type == "dm" && ouID != nil {
+			cwm.OtherUser = &User{
+				ID:        *ouID,
+				CreatedAt: *ouCreatedAt,
+				UpdatedAt: *ouUpdatedAt,
+				State:     *ouState,
+				Public:    ouPublic,
+				LastSeen:  ouLastSeen,
+			}
+			if ouUserAgent != nil {
+				cwm.OtherUser.UserAgent = *ouUserAgent
+			}
+			if ouMustChangePassword != nil {
+				cwm.OtherUser.MustChangePassword = *ouMustChangePassword
+			}
+			if ouEmail != nil {
+				cwm.OtherUser.Email = ouEmail
+			}
+			if ouEmailVerified != nil {
+				cwm.OtherUser.EmailVerified = *ouEmailVerified
 			}
 		}
+
+		results = append(results, cwm)
 	}
 
 	return results, rows.Err()
