@@ -38,10 +38,12 @@ ENV DB_PORT=5432
 ENV DB_NAME=mvchat2
 ENV DB_USER=postgres
 ENV DB_PASSWORD=
-ENV UID_KEY=la6YsO+bNX/+XIkOqc5Svw==
+# Security keys - MUST be provided at runtime via docker-compose or -e flags
+# Generate with: ./mvchat2 --generate-keys
+ENV UID_KEY=
 ENV ENCRYPTION_KEY=
-ENV API_KEY_SALT=T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=
-ENV TOKEN_KEY=wfaY2RgF2S1OQI/ZlK+LSrp1KB2jwAdGAIHQ7JZn+Kc=
+ENV API_KEY_SALT=
+ENV TOKEN_KEY=
 
 EXPOSE 6060
 
