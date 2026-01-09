@@ -1,6 +1,20 @@
 # Database Schema and Query Issues
 
+**Last Updated:** January 8, 2026
+**Status:** Critical issues RESOLVED, some performance items remain
+
 This document catalogs schema inconsistencies, missing indexes, and query performance issues.
+
+## Resolution Summary
+
+| Issue | Status |
+|-------|--------|
+| Schema mismatch (uploader_id) | FIXED - Migration 004 |
+| Missing hash field handling | FIXED - Migration 004 (nullable) |
+| Missing indexes | FIXED - Migration 005 |
+| N+1 query problem | NOT FIXED |
+| Missing transaction in AddContact | NOT FIXED |
+| Dynamic SQL validation | FIXED - Uses typed struct |
 
 ## Critical Issues
 

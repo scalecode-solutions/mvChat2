@@ -1,6 +1,20 @@
 # WebSocket and Protocol Issues
 
+**Last Updated:** January 8, 2026
+**Status:** Critical concurrency issues RESOLVED, protocol improvements remain
+
 This document catalogs issues with WebSocket handling, protocol implementation, and real-time communication.
+
+## Resolution Summary
+
+| Issue | Status |
+|-------|--------|
+| Session field data races | FIXED - sync.RWMutex added |
+| WebSocket rate limiting | FIXED - Token bucket limiter |
+| Send() race condition | FIXED - defer recover pattern |
+| Message ID validation | NOT FIXED |
+| Multiple message types | NOT FIXED |
+| Connection leak on channel full | NOT FIXED |
 
 ## Critical Issues
 
