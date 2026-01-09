@@ -52,14 +52,15 @@ type MockStore struct {
 	GetReadReceiptsFn      func(ctx context.Context, convID uuid.UUID) ([]ReadReceipt, error)
 
 	// Messages
-	CreateMessageFn       func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
-	GetMessagesFn         func(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
-	GetMessageBySeqFn     func(ctx context.Context, convID uuid.UUID, seq int) (*Message, error)
-	EditMessageFn         func(ctx context.Context, convID uuid.UUID, seq int, content []byte) error
-	UnsendMessageFn       func(ctx context.Context, convID uuid.UUID, seq int) error
-	DeleteMessageForUserFn func(ctx context.Context, msgID, userID uuid.UUID) error
-	AddReactionFn         func(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
-	GetEditCountFn        func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+	CreateMessageFn            func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
+	GetMessagesFn              func(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
+	GetMessageBySeqFn          func(ctx context.Context, convID uuid.UUID, seq int) (*Message, error)
+	EditMessageFn              func(ctx context.Context, convID uuid.UUID, seq int, content []byte) error
+	UnsendMessageFn            func(ctx context.Context, convID uuid.UUID, seq int) error
+	DeleteMessageForEveryoneFn func(ctx context.Context, convID uuid.UUID, seq int) error
+	DeleteMessageForUserFn     func(ctx context.Context, msgID, userID uuid.UUID) error
+	AddReactionFn              func(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
+	GetEditCountFn             func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
 
 	// Files
 	CreateFileFn           func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
@@ -339,6 +340,13 @@ func (m *MockStore) EditMessage(ctx context.Context, convID uuid.UUID, seq int, 
 func (m *MockStore) UnsendMessage(ctx context.Context, convID uuid.UUID, seq int) error {
 	if m.UnsendMessageFn != nil {
 		return m.UnsendMessageFn(ctx, convID, seq)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteMessageForEveryone(ctx context.Context, convID uuid.UUID, seq int) error {
+	if m.DeleteMessageForEveryoneFn != nil {
+		return m.DeleteMessageForEveryoneFn(ctx, convID, seq)
 	}
 	return nil
 }

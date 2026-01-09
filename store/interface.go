@@ -61,6 +61,7 @@ type Store interface {
 	GetMessageBySeq(ctx context.Context, convID uuid.UUID, seq int) (*Message, error)
 	EditMessage(ctx context.Context, convID uuid.UUID, seq int, content []byte) error
 	UnsendMessage(ctx context.Context, convID uuid.UUID, seq int) error
+	DeleteMessageForEveryone(ctx context.Context, convID uuid.UUID, seq int) error
 	DeleteMessageForUser(ctx context.Context, msgID, userID uuid.UUID) error
 	AddReaction(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
 	GetEditCount(ctx context.Context, convID uuid.UUID, seq int) (int, error)

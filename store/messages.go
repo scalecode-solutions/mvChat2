@@ -148,11 +148,24 @@ func (db *DB) EditMessage(ctx context.Context, convID uuid.UUID, seq int, conten
 	return err
 }
 
-// UnsendMessage marks a message as deleted (hard delete for everyone).
+// UnsendMessage marks a message as unsent (soft delete for everyone).
+// Only usable within the unsend time window. Content is preserved for audit.
 func (db *DB) UnsendMessage(ctx context.Context, convID uuid.UUID, seq int) error {
 	now := time.Now().UTC()
 	_, err := db.pool.Exec(ctx, `
-		UPDATE messages SET deleted_at = $3, content = NULL, updated_at = $3
+		UPDATE messages SET deleted_at = $3, updated_at = $3,
+			head = COALESCE(head, '{}'::jsonb) || '{"unsent": true}'::jsonb
+		WHERE conversation_id = $1 AND seq = $2
+	`, convID, seq, now)
+	return err
+}
+
+// DeleteMessageForEveryone marks a message as deleted for all participants (soft delete).
+// No time limit. Content is preserved for audit.
+func (db *DB) DeleteMessageForEveryone(ctx context.Context, convID uuid.UUID, seq int) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE messages SET deleted_at = $3, updated_at = $3
 		WHERE conversation_id = $1 AND seq = $2
 	`, convID, seq, now)
 	return err

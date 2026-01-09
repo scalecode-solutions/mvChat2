@@ -700,7 +700,7 @@ func (h *Handlers) handleDelete(s SessionInterface, msg *ClientMessage) {
 			return
 		}
 
-		if err := h.db.UnsendMessage(ctx, convID, del.Seq); err != nil {
+		if err := h.db.DeleteMessageForEveryone(ctx, convID, del.Seq); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to delete"))
 			return
 		}
