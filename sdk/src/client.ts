@@ -36,6 +36,7 @@ export class MVChat2Client {
   private _token: string | null = null;
   private _userID: string | null = null;
   private _mustChangePassword: boolean = false;
+  private _emailVerified: boolean = true;
 
   constructor(config: MVChat2ClientConfig) {
     this.config = {
@@ -76,6 +77,10 @@ export class MVChat2Client {
 
   get mustChangePassword(): boolean {
     return this._mustChangePassword;
+  }
+
+  get emailVerified(): boolean {
+    return this._emailVerified;
   }
 
   // Connection management
@@ -324,12 +329,14 @@ export class MVChat2Client {
     this._userID = ctrl.params?.user;
     this._token = ctrl.params?.token;
     this._mustChangePassword = ctrl.params?.mustChangePassword ?? false;
+    this._emailVerified = ctrl.params?.emailVerified ?? true;
 
     return {
       user: ctrl.params?.user,
       token: ctrl.params?.token,
       expires: ctrl.params?.expires,
       mustChangePassword: ctrl.params?.mustChangePassword,
+      emailVerified: ctrl.params?.emailVerified,
     };
   }
 
@@ -344,12 +351,14 @@ export class MVChat2Client {
     this._userID = ctrl.params?.user;
     this._token = token;
     this._mustChangePassword = ctrl.params?.mustChangePassword ?? false;
+    this._emailVerified = ctrl.params?.emailVerified ?? true;
 
     return {
       user: ctrl.params?.user,
       token,
       expires: ctrl.params?.expires,
       mustChangePassword: ctrl.params?.mustChangePassword,
+      emailVerified: ctrl.params?.emailVerified,
     };
   }
 
@@ -370,6 +379,7 @@ export class MVChat2Client {
       this._userID = ctrl.params?.user;
       this._token = ctrl.params?.token;
       this._mustChangePassword = ctrl.params?.mustChangePassword ?? false;
+      this._emailVerified = ctrl.params?.emailVerified ?? true;
     }
 
     return {
@@ -378,6 +388,7 @@ export class MVChat2Client {
       expires: ctrl.params?.expires,
       inviters: ctrl.params?.inviters,
       mustChangePassword: ctrl.params?.mustChangePassword,
+      emailVerified: ctrl.params?.emailVerified,
     };
   }
 
@@ -416,6 +427,7 @@ export class MVChat2Client {
     this._token = null;
     this._user = null;
     this._mustChangePassword = false;
+    this._emailVerified = true;
   }
 
   // Conversations

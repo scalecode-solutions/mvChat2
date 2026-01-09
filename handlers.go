@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/scalecode-solutions/mvchat2/auth"
+	"github.com/scalecode-solutions/mvchat2/config"
 	"github.com/scalecode-solutions/mvchat2/crypto"
 	"github.com/scalecode-solutions/mvchat2/email"
 	"github.com/scalecode-solutions/mvchat2/store"
@@ -29,10 +31,11 @@ type Handlers struct {
 	encryptor    *crypto.Encryptor
 	email        *email.Service
 	inviteTokens *crypto.InviteTokenGenerator
+	cfg          *config.Config
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service, inviteTokens *crypto.InviteTokenGenerator) *Handlers {
+func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service, inviteTokens *crypto.InviteTokenGenerator, cfg *config.Config) *Handlers {
 	return &Handlers{
 		db:           db,
 		auth:         a,
@@ -40,6 +43,7 @@ func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, em
 		encryptor:    enc,
 		email:        emailSvc,
 		inviteTokens: inviteTokens,
+		cfg:          cfg,
 	}
 }
 
@@ -117,9 +121,10 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *Client
 	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
 
 	params := map[string]any{
-		"user":    user.ID.String(),
-		"token":   token,
-		"expires": expiresAt,
+		"user":          user.ID.String(),
+		"token":         token,
+		"expires":       expiresAt,
+		"emailVerified": user.EmailVerified,
 		"desc": map[string]any{
 			"public": user.Public,
 		},
@@ -163,9 +168,10 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *Client
 	}
 
 	params := map[string]any{
-		"user":    user.ID.String(),
-		"token":   token,
-		"expires": expiresAt,
+		"user":          user.ID.String(),
+		"token":         token,
+		"expires":       expiresAt,
+		"emailVerified": user.EmailVerified,
 		"desc": map[string]any{
 			"public": user.Public,
 		},
@@ -257,8 +263,13 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 	}
 
+	// Determine email verification status based on config
+	// For DV safety: if verification is DISABLED (default), mark as verified
+	// If verification is ENABLED, mark as unverified (needs email confirmation)
+	emailVerified := !h.cfg.Email.Verification.Enabled
+
 	// Create user with email from invite (if available)
-	userID, err := h.db.CreateUserWithOptions(ctx, public, mustChangePassword, userEmail)
+	userID, err := h.db.CreateUserWithOptions(ctx, public, mustChangePassword, userEmail, emailVerified)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create user"))
 		return
@@ -275,6 +286,23 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 	if err := h.db.CreateAuthRecord(ctx, userID, "basic", hashedPassword, &username); err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create auth record"))
 		return
+	}
+
+	// If verification is enabled and user has an email, send verification email
+	if h.cfg.Email.Verification.Enabled && userEmail != nil {
+		token, err := h.generateVerificationToken()
+		if err == nil {
+			expiryHours := h.cfg.Email.Verification.TokenExpiryHours
+			if expiryHours <= 0 {
+				expiryHours = 24
+			}
+			expiresAt := time.Now().UTC().Add(time.Duration(expiryHours) * time.Hour)
+
+			if err := h.db.SetEmailVerificationToken(ctx, userID, token, expiresAt); err == nil {
+				// Send verification email (don't fail account creation if email fails)
+				_ = h.email.SendVerification(*userEmail, token)
+			}
+		}
 	}
 
 	// If invite code provided, redeem it (creates DMs and contacts with inviters)
@@ -300,9 +328,10 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 
 		params := map[string]any{
-			"user":    userID.String(),
-			"token":   token,
-			"expires": expiresAt,
+			"user":          userID.String(),
+			"token":         token,
+			"expires":       expiresAt,
+			"emailVerified": emailVerified,
 			"desc": map[string]any{
 				"public": public,
 			},
@@ -316,7 +345,8 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	} else {
 		params := map[string]any{
-			"user": userID.String(),
+			"user":          userID.String(),
+			"emailVerified": emailVerified,
 			"desc": map[string]any{
 				"public": public,
 			},
@@ -451,4 +481,14 @@ func (h *Handlers) HandleSearch(s *Session, msg *ClientMessage) {
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
 		"users": results,
 	}))
+}
+
+// generateVerificationToken generates a cryptographically secure random token
+// for email verification. Returns a URL-safe base64 encoded string.
+func (h *Handlers) generateVerificationToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := cryptorand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }

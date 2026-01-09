@@ -28,10 +28,16 @@ CREATE TABLE users (
     must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- User's email address (for password reset, verification, etc.)
-    email VARCHAR(255)
+    email VARCHAR(255),
+
+    -- Email verification (defaults to TRUE for safety in DV contexts)
+    email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+    email_verification_token VARCHAR(64),
+    email_verification_expires TIMESTAMPTZ
 );
 
 CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL;
 
 CREATE INDEX idx_users_state ON users(state) WHERE state != 'deleted';
 

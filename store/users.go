@@ -21,6 +21,7 @@ type User struct {
 	UserAgent          string          `json:"userAgent,omitempty"`
 	MustChangePassword bool            `json:"mustChangePassword,omitempty"`
 	Email              *string         `json:"email,omitempty"`
+	EmailVerified      bool            `json:"emailVerified,omitempty"`
 }
 
 // AuthRecord represents an authentication record.
@@ -36,18 +37,25 @@ type AuthRecord struct {
 
 // CreateUser creates a new user and returns the user ID.
 func (db *DB) CreateUser(ctx context.Context, public json.RawMessage) (uuid.UUID, error) {
-	return db.CreateUserWithOptions(ctx, public, false, nil)
+	return db.CreateUserWithOptions(ctx, public, false, nil, true) // email_verified defaults to true for safety
+}
+
+// CreateUserOptions holds optional parameters for user creation.
+type CreateUserOptions struct {
+	MustChangePassword bool
+	Email              *string
+	EmailVerified      bool // Defaults to true for safety (DV context)
 }
 
 // CreateUserWithOptions creates a new user with additional options.
-func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage, mustChangePassword bool, email *string) (uuid.UUID, error) {
+func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage, mustChangePassword bool, email *string, emailVerified bool) (uuid.UUID, error) {
 	id := uuid.New()
 	now := time.Now().UTC()
 
 	_, err := db.pool.Exec(ctx, `
-		INSERT INTO users (id, created_at, updated_at, state, public, must_change_password, email)
-		VALUES ($1, $2, $3, 'ok', $4, $5, $6)
-	`, id, now, now, public, mustChangePassword, email)
+		INSERT INTO users (id, created_at, updated_at, state, public, must_change_password, email, email_verified)
+		VALUES ($1, $2, $3, 'ok', $4, $5, $6, $7)
+	`, id, now, now, public, mustChangePassword, email, emailVerified)
 
 	if err != nil {
 		return uuid.Nil, err
@@ -59,9 +67,9 @@ func (db *DB) CreateUserWithOptions(ctx context.Context, public json.RawMessage,
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var user User
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
 		FROM users WHERE id = $1 AND state != 'deleted'
-	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email)
+	`, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -163,9 +171,9 @@ func (db *DB) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email *stri
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
 		FROM users WHERE email = $1 AND state != 'deleted'
-	`, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email)
+	`, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -213,7 +221,7 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	}
 
 	rows, err := db.pool.Query(ctx, `
-		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email
+		SELECT id, created_at, updated_at, state, public, last_seen, user_agent, must_change_password, email, email_verified
 		FROM users
 		WHERE state = 'ok'
 		AND public->>'fn' ILIKE '%' || $1 || '%'
@@ -228,10 +236,63 @@ func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User,
 	var users []User
 	for rows.Next() {
 		var user User
-		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email); err != nil {
+		if err := rows.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.State, &user.Public, &user.LastSeen, &user.UserAgent, &user.MustChangePassword, &user.Email, &user.EmailVerified); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
 	}
 	return users, rows.Err()
+}
+
+// SetEmailVerificationToken sets a verification token for a user's email.
+// Returns the generated token.
+func (db *DB) SetEmailVerificationToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE users SET
+			email_verification_token = $2,
+			email_verification_expires = $3,
+			email_verified = FALSE,
+			updated_at = $4
+		WHERE id = $1
+	`, userID, token, expiresAt, time.Now().UTC())
+	return err
+}
+
+// VerifyEmailByToken verifies a user's email using the verification token.
+// Returns the user ID if successful, nil if token not found or expired.
+func (db *DB) VerifyEmailByToken(ctx context.Context, token string) (*uuid.UUID, error) {
+	var userID uuid.UUID
+	err := db.pool.QueryRow(ctx, `
+		UPDATE users SET
+			email_verified = TRUE,
+			email_verification_token = NULL,
+			email_verification_expires = NULL,
+			updated_at = $2
+		WHERE email_verification_token = $1
+			AND email_verification_expires > $2
+			AND state != 'deleted'
+		RETURNING id
+	`, token, time.Now().UTC()).Scan(&userID)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // Token not found or expired
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &userID, nil
+}
+
+// MarkEmailVerified marks a user's email as verified (without token).
+// Used when email verification is disabled in config.
+func (db *DB) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE users SET
+			email_verified = TRUE,
+			email_verification_token = NULL,
+			email_verification_expires = NULL,
+			updated_at = $2
+		WHERE id = $1
+	`, userID, time.Now().UTC())
+	return err
 }

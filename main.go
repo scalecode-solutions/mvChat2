@@ -164,7 +164,7 @@ func main() {
 	}
 
 	// Initialize handlers
-	handlers := NewHandlers(db, authService, hub, encryptor, emailService, inviteTokenGen)
+	handlers := NewHandlers(db, authService, hub, encryptor, emailService, inviteTokenGen, cfg)
 
 	// Initialize media processor
 	mediaProcessor := media.NewProcessor(media.Config{

@@ -129,6 +129,23 @@ type EmailConfig struct {
 	Password string `yaml:"password"`
 	From     string `yaml:"from"`
 	FromName string `yaml:"from_name"`
+
+	// Verification settings
+	// IMPORTANT: For DV (domestic violence) apps, email verification should be DISABLED
+	// by default to prevent alerting abusers that the user has signed up for a messaging app.
+	Verification EmailVerificationConfig `yaml:"verification"`
+}
+
+// EmailVerificationConfig contains email verification settings.
+// Disabled by default for user safety in sensitive contexts.
+type EmailVerificationConfig struct {
+	// Enabled controls whether email verification is required.
+	// Default: false (emails are auto-verified for user safety)
+	Enabled bool `yaml:"enabled"`
+
+	// TokenExpiryHours is how long verification tokens remain valid.
+	// Default: 24 hours
+	TokenExpiryHours int `yaml:"token_expiry_hours"`
 }
 
 // Load reads and parses a YAML config file.
@@ -281,6 +298,13 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Limits.RateLimitUpload == 0 {
 		c.Limits.RateLimitUpload = 10 // 10 uploads per minute
+	}
+
+	// Email verification defaults
+	// NOTE: Verification is DISABLED by default for user safety (DV context)
+	// c.Email.Verification.Enabled defaults to false (zero value)
+	if c.Email.Verification.TokenExpiryHours == 0 {
+		c.Email.Verification.TokenExpiryHours = 24 // 24 hours
 	}
 }
 

@@ -47,6 +47,7 @@ export interface AuthResult {
   expires: string;
   inviters?: string[];
   mustChangePassword?: boolean;
+  emailVerified?: boolean;
 }
 
 export interface ChangePasswordData {

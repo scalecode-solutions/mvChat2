@@ -38,6 +38,33 @@ func (s *Service) IsEnabled() bool {
 	return s.cfg.Enabled
 }
 
+// SendVerification sends an email verification link.
+func (s *Service) SendVerification(toEmail, token string) error {
+	if !s.cfg.Enabled {
+		return nil
+	}
+
+	// Validate email address
+	if _, err := mail.ParseAddress(toEmail); err != nil {
+		return fmt.Errorf("invalid email address: %w", err)
+	}
+
+	subject := "Verify your email address"
+
+	// The token is URL-safe base64, but we still escape it for safety
+	data := map[string]string{
+		"Token": html.EscapeString(token),
+		"Link":  fmt.Sprintf("https://chat.mvchat.app/verify-email?token=%s", token),
+	}
+
+	body, err := s.renderTemplate(verificationTemplate, data)
+	if err != nil {
+		return err
+	}
+
+	return s.send(toEmail, subject, body)
+}
+
 // SendInvite sends an invite code email.
 func (s *Service) SendInvite(toEmail, toName, code, inviterName string) error {
 	if !s.cfg.Enabled {
@@ -259,6 +286,36 @@ const inviteTemplate = `<!DOCTYPE html>
     </div>
     <div class="footer">
         <p>This invitation was sent by {{.InviterName}}. If you didn't expect this, you can safely ignore it.</p>
+    </div>
+</body>
+</html>`
+
+const verificationTemplate = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+        .footer { text-align: center; margin-top: 20px; color: #888; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Verify Your Email</h1>
+    </div>
+    <div class="content">
+        <p>Please click the button below to verify your email address:</p>
+        <p style="text-align: center;">
+            <a href="{{.Link}}" class="button">Verify Email</a>
+        </p>
+        <p>This link expires in 24 hours.</p>
+        <p style="font-size: 12px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
+    </div>
+    <div class="footer">
+        <p>mvChat - Secure Messaging</p>
     </div>
 </body>
 </html>`
