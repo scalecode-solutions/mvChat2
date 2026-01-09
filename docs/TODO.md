@@ -222,7 +222,7 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Message search (metadata only - sender, date, conversation)
 - [ ] User-controlled encrypted search index (client builds, encrypts, uploads; only user can search their own content)
 - [x] Room management (invite/leave/kick/update with role-based permissions)
-- [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
+- [ ] In-app audio calls (WebRTC without CallKit - stealth mode). See [docs/audio-calls.md](audio-calls.md)
 - [ ] Webhooks (optional - for enterprise/professional integrations)
 - [ ] @mention notifications (special indicator when mentioned in rooms)
 - [ ] @everyone / @here for rooms
