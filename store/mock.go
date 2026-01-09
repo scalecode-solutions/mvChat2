@@ -12,14 +12,14 @@ import (
 // Each method field can be set to a custom function to control behavior.
 type MockStore struct {
 	// Users
-	CreateUserFn              func(ctx context.Context, public json.RawMessage) (uuid.UUID, error)
-	CreateUserWithOptionsFn   func(ctx context.Context, public json.RawMessage, mustChangePassword bool, email *string, emailVerified bool) (uuid.UUID, error)
-	GetUserByIDFn             func(ctx context.Context, id uuid.UUID) (*User, error)
-	GetUserByEmailFn          func(ctx context.Context, email string) (*User, error)
-	UpdateUserLastSeenFn      func(ctx context.Context, userID uuid.UUID, userAgent string) error
-	UpdateUserPublicFn        func(ctx context.Context, userID uuid.UUID, public json.RawMessage) error
-	UpdateUserEmailFn         func(ctx context.Context, userID uuid.UUID, email *string) error
-	SearchUsersFn             func(ctx context.Context, query string, limit int) ([]User, error)
+	CreateUserFn            func(ctx context.Context, public json.RawMessage) (uuid.UUID, error)
+	CreateUserWithOptionsFn func(ctx context.Context, public json.RawMessage, mustChangePassword bool, email *string, emailVerified bool) (uuid.UUID, error)
+	GetUserByIDFn           func(ctx context.Context, id uuid.UUID) (*User, error)
+	GetUserByEmailFn        func(ctx context.Context, email string) (*User, error)
+	UpdateUserLastSeenFn    func(ctx context.Context, userID uuid.UUID, userAgent string) error
+	UpdateUserPublicFn      func(ctx context.Context, userID uuid.UUID, public json.RawMessage) error
+	UpdateUserEmailFn       func(ctx context.Context, userID uuid.UUID, email *string) error
+	SearchUsersFn           func(ctx context.Context, query string, limit int) ([]User, error)
 
 	// Auth
 	CreateAuthRecordFn        func(ctx context.Context, userID uuid.UUID, scheme, secret string, uname *string) error
@@ -63,18 +63,18 @@ type MockStore struct {
 	GetEditCountFn             func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
 
 	// Files
-	CreateFileFn           func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
-	CreateFileWithHashFn   func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
-	CreateFileWithIDFn     func(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
-	GetFileByIDFn          func(ctx context.Context, id uuid.UUID) (*File, error)
-	GetFileByHashFn        func(ctx context.Context, hash string) (*File, error)
-	GetFileWithMetadataFn  func(ctx context.Context, id uuid.UUID) (*FileWithMetadata, error)
-	GetFileMetadataFn      func(ctx context.Context, fileID uuid.UUID) (*FileMetadata, error)
-	CreateFileMetadataFn   func(ctx context.Context, fileID uuid.UUID, width, height *int, duration *float64, thumbnail *string, extra json.RawMessage) error
-	UpdateFileStatusFn     func(ctx context.Context, fileID uuid.UUID, status string) error
-	UpdateFileLocationFn   func(ctx context.Context, fileID uuid.UUID, location string) error
-	DeleteFileFn           func(ctx context.Context, fileID uuid.UUID) error
-	CanAccessFileFn        func(ctx context.Context, fileID, userID uuid.UUID) (bool, error)
+	CreateFileFn          func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
+	CreateFileWithHashFn  func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
+	CreateFileWithIDFn    func(ctx context.Context, fileID, uploaderID uuid.UUID, mimeType string, size int64, location, hash, originalName string) (*File, error)
+	GetFileByIDFn         func(ctx context.Context, id uuid.UUID) (*File, error)
+	GetFileByHashFn       func(ctx context.Context, hash string) (*File, error)
+	GetFileWithMetadataFn func(ctx context.Context, id uuid.UUID) (*FileWithMetadata, error)
+	GetFileMetadataFn     func(ctx context.Context, fileID uuid.UUID) (*FileMetadata, error)
+	CreateFileMetadataFn  func(ctx context.Context, fileID uuid.UUID, width, height *int, duration *float64, thumbnail *string, extra json.RawMessage) error
+	UpdateFileStatusFn    func(ctx context.Context, fileID uuid.UUID, status string) error
+	UpdateFileLocationFn  func(ctx context.Context, fileID uuid.UUID, location string) error
+	DeleteFileFn          func(ctx context.Context, fileID uuid.UUID) error
+	CanAccessFileFn       func(ctx context.Context, fileID, userID uuid.UUID) (bool, error)
 
 	// Invites
 	CreateInviteCodeFn            func(ctx context.Context, inviterID uuid.UUID, code, token, email string, inviteeName *string) (*InviteCode, error)
@@ -88,11 +88,11 @@ type MockStore struct {
 	ExpireOldInvitesFn            func(ctx context.Context) (int64, error)
 
 	// Contacts
-	AddContactFn             func(ctx context.Context, userID, contactID uuid.UUID, source string, inviteID *uuid.UUID) error
-	GetContactsFn            func(ctx context.Context, userID uuid.UUID) ([]Contact, error)
-	IsContactFn              func(ctx context.Context, userID, contactID uuid.UUID) (bool, error)
-	UpdateContactNicknameFn  func(ctx context.Context, userID, contactID uuid.UUID, nickname *string) error
-	RemoveContactFn          func(ctx context.Context, userID, contactID uuid.UUID) error
+	AddContactFn            func(ctx context.Context, userID, contactID uuid.UUID, source string, inviteID *uuid.UUID) error
+	GetContactsFn           func(ctx context.Context, userID uuid.UUID) ([]Contact, error)
+	IsContactFn             func(ctx context.Context, userID, contactID uuid.UUID) (bool, error)
+	UpdateContactNicknameFn func(ctx context.Context, userID, contactID uuid.UUID, nickname *string) error
+	RemoveContactFn         func(ctx context.Context, userID, contactID uuid.UUID) error
 }
 
 // Compile-time check that MockStore implements Store.
