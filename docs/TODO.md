@@ -140,13 +140,16 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 |--------|------|-------------|
 | id | UUID | Primary key |
 | inviter_id | UUID | Who created the invite |
-| code | VARCHAR(10) | 10-digit numeric code |
+| code | VARCHAR(10) | Short 10-char base64url code (user-friendly) |
+| token | TEXT | AES-256-GCM encrypted full cryptographic token |
 | email | VARCHAR(255) | Recipient email |
 | invitee_name | VARCHAR(128) | Optional display name |
 | status | VARCHAR(16) | 'pending', 'used', 'expired', 'revoked' |
 | used_at | TIMESTAMPTZ | When redeemed |
 | used_by | UUID | Who redeemed it |
 | expires_at | TIMESTAMPTZ | Default: 7 days from creation |
+
+**Note:** The invite system uses a two-layer architecture. See [docs/invite-tokens.md](invite-tokens.md) for full cryptographic details.
 
 ### contacts
 | Column | Type | Description |
@@ -157,10 +160,31 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 | nickname | VARCHAR(64) | Optional custom name |
 | invite_id | UUID | Reference to invite (if source='invite') |
 
+## Completed
+
+### Security (January 2025)
+- [x] **Two-layer invite code system** - Short 10-char base64url codes for sharing, full cryptographic tokens stored encrypted
+- [x] **Invite token encryption** - AES-256-GCM encryption for tokens before database storage (prevents exposure if DB compromised)
+- [x] **Email header injection prevention** - Sanitization for CR/LF characters in email headers
+- [x] **Email HTML injection prevention** - html.EscapeString() for all user-controlled template data
+- [x] **Email validation** - mail.ParseAddress() validation before sending
+- [x] **Invite token HMAC signatures** - HMAC-SHA256 verification for token integrity
+- [x] **Password change endpoint** - Users can change their password
+- [x] **Unsend time limit** - 5-minute window for unsending messages
+- [x] **Edit limits** - 10 edits per message within 15 minutes
+
+### SDKs (January 2025)
+- [x] **React Native SDK** - Full TypeScript SDK with hooks (useAuth, useMessages, useConversations, useContacts, useTyping)
+- [x] **SDK documentation** - Comprehensive docs in sdk/README.md
+
+### Infrastructure
+- [x] **Rate limiting** - Caddy-based rate limiting (100 req/min API, 10 req/min auth)
+- [x] **WebSocket typing indicators** - Client-side debouncing (3s), not subject to HTTP rate limits
+
 ## Future Enhancements
 
 ### Backend (mvChat2)
-- [ ] Password change endpoint
+- [x] Password change endpoint
 - [ ] `must_change_password` flag for temp passwords
 - [ ] Store email on user account (currently only in invite)
 - [ ] Email verification flow
@@ -179,9 +203,9 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Scheduled messages (send at future time)
 - [ ] Pinned messages in rooms
 - [ ] Disappearing messages (auto soft-delete after X time)
-- [ ] Unsend time limit enforcement (configurable, e.g., 5 minutes)
+- [x] Unsend time limit enforcement (5 minutes)
 - [ ] Delete for everyone (separate from unsend, no time limit)
-- [ ] Edit limits (10 edits per message within 15 minutes, then locked)
+- [x] Edit limits (10 edits per message within 15 minutes, then locked)
 - [ ] Location sharing for emergencies
 - [ ] Pre-recorded distress messages (record when safe, send with one tap when in danger)
 - [ ] Emergency quick-send to all trusted contacts
@@ -196,11 +220,11 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Room cleanup policy (configurable TTL for inactive rooms, or keep forever)
 
 ### SDKs
-- [ ] React Native SDK (for Clingy and future mobile apps)
-- [ ] TypeScript/JavaScript SDK (for web clients)
+- [x] React Native SDK (for Clingy and future mobile apps)
+- [x] TypeScript/JavaScript SDK (for web clients) - included in React Native SDK
 - [ ] Swift SDK (native iOS)
 - [ ] Kotlin SDK (native Android)
-- [ ] SDK documentation and examples
+- [x] SDK documentation and examples
 
 ### Web Client (chat.mvchat.app)
 - [ ] Web version of Clingy chat interface

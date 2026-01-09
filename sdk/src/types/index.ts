@@ -46,6 +46,7 @@ export interface AuthResult {
   token: string;
   expires: string;
   inviters?: string[];
+  mustChangePassword?: boolean;
 }
 
 export interface ChangePasswordData {

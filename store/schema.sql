@@ -22,7 +22,10 @@ CREATE TABLE users (
     
     -- Last activity tracking
     last_seen TIMESTAMPTZ,
-    user_agent VARCHAR(255)
+    user_agent VARCHAR(255),
+
+    -- Temporary password flag (user must change password on next login)
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE INDEX idx_users_state ON users(state) WHERE state != 'deleted';

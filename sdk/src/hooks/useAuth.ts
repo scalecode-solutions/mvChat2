@@ -6,6 +6,7 @@ export interface UseAuthResult {
   isAuthenticated: boolean;
   user: User | null;
   userID: string | null;
+  mustChangePassword: boolean;
   isLoading: boolean;
   error: Error | null;
   login: (credentials: LoginCredentials) => Promise<AuthResult>;
@@ -82,6 +83,7 @@ export function useAuth(client: MVChat2Client): UseAuthResult {
     isAuthenticated: client.isAuthenticated,
     user: client.user,
     userID: client.userID,
+    mustChangePassword: client.mustChangePassword,
     isLoading,
     error,
     login,

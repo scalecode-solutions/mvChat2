@@ -116,14 +116,18 @@ func (h *Handlers) handleBasicLogin(ctx context.Context, s *Session, msg *Client
 	// Update last seen
 	h.db.UpdateUserLastSeen(ctx, user.ID, s.UserAgent())
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+	params := map[string]any{
 		"user":    user.ID.String(),
 		"token":   token,
 		"expires": expiresAt,
 		"desc": map[string]any{
 			"public": user.Public,
 		},
-	}))
+	}
+	if user.MustChangePassword {
+		params["mustChangePassword"] = true
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeOK, params))
 }
 
 func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *ClientMessage, secret string) {
@@ -158,14 +162,18 @@ func (h *Handlers) handleTokenLogin(ctx context.Context, s *Session, msg *Client
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+	params := map[string]any{
 		"user":    user.ID.String(),
 		"token":   token,
 		"expires": expiresAt,
 		"desc": map[string]any{
 			"public": user.Public,
 		},
-	}))
+	}
+	if user.MustChangePassword {
+		params["mustChangePassword"] = true
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeOK, params))
 }
 
 // HandleAcc processes account creation/update requests.
@@ -236,8 +244,12 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		public = acc.Desc.Public
 	}
 
+	// Detect if user is signing up with invite code as password (temporary password)
+	// In this case, they must change their password after login
+	mustChangePassword := acc.InviteCode != "" && password == acc.InviteCode
+
 	// Create user
-	userID, err := h.db.CreateUser(ctx, public)
+	userID, err := h.db.CreateUserWithOptions(ctx, public, mustChangePassword)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to create user"))
 		return
@@ -289,6 +301,9 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		if len(connectedInviters) > 0 {
 			params["inviters"] = connectedInviters
 		}
+		if mustChangePassword {
+			params["mustChangePassword"] = true
+		}
 		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	} else {
 		params := map[string]any{
@@ -299,6 +314,9 @@ func (h *Handlers) handleCreateAccount(ctx context.Context, s *Session, msg *Cli
 		}
 		if len(connectedInviters) > 0 {
 			params["inviters"] = connectedInviters
+		}
+		if mustChangePassword {
+			params["mustChangePassword"] = true
 		}
 		s.Send(CtrlSuccess(msg.ID, CodeCreated, params))
 	}
@@ -367,6 +385,11 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s *Session, msg *Cli
 		if err := h.db.UpdatePassword(ctx, s.userID, hashedPassword); err != nil {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update password"))
 			return
+		}
+
+		// Clear the must_change_password flag since user has now changed their password
+		if err := h.db.ClearMustChangePassword(ctx, s.userID); err != nil {
+			// Log but don't fail - password was successfully changed
 		}
 	}
 
