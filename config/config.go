@@ -235,7 +235,7 @@ func (c *Config) applyDefaults() {
 		c.Database.User = "postgres"
 	}
 	if c.Database.SSLMode == "" {
-		c.Database.SSLMode = "disable"
+		c.Database.SSLMode = "prefer"
 	}
 	if c.Database.MaxOpenConns == 0 {
 		c.Database.MaxOpenConns = 50

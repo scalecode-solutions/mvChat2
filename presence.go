@@ -33,7 +33,9 @@ func (p *PresenceManager) UserOnline(userID uuid.UUID) {
 
 	// Update Redis presence cache if enabled
 	if p.redis != nil {
-		p.redis.SetOnline(ctx, userID.String())
+		if err := p.redis.SetOnline(ctx, userID.String()); err != nil {
+			log.Printf("presence: failed to set online for user %s: %v", userID, err)
+		}
 	}
 
 	// Get all users who should be notified (DM partners and group members)
@@ -59,7 +61,9 @@ func (p *PresenceManager) UserOffline(userID uuid.UUID) {
 
 	// Remove from Redis presence cache if enabled
 	if p.redis != nil {
-		p.redis.SetOffline(ctx, userID.String())
+		if err := p.redis.SetOffline(ctx, userID.String()); err != nil {
+			log.Printf("presence: failed to set offline for user %s: %v", userID, err)
+		}
 	}
 
 	// Update last_seen in database
@@ -204,6 +208,8 @@ func (p *PresenceManager) refreshOnlineUsers(ctx context.Context) {
 	p.hub.mu.RUnlock()
 
 	for _, uid := range userIDs {
-		p.redis.RefreshOnline(ctx, uid.String())
+		if err := p.redis.RefreshOnline(ctx, uid.String()); err != nil {
+			log.Printf("presence: failed to refresh online for user %s: %v", uid, err)
+		}
 	}
 }

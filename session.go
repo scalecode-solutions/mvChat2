@@ -237,12 +237,18 @@ func (s *Session) writePump() {
 			}
 
 			if err := s.conn.WriteJSON(msg); err != nil {
+				if !websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Printf("session %s: WriteJSON error: %v", s.id, err)
+				}
 				return
 			}
 
 		case <-ticker.C:
 			s.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := s.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				if !websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Printf("session %s: ping error: %v", s.id, err)
+				}
 				return
 			}
 		}

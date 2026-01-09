@@ -195,10 +195,17 @@ func (h *Hub) GetSession(id string) *Session {
 }
 
 // GetUserSessions returns all sessions for a user.
+// Returns a copy of the slice to avoid race conditions after lock release.
 func (h *Hub) GetUserSessions(userID uuid.UUID) []*Session {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.userSessions[userID]
+	orig := h.userSessions[userID]
+	if len(orig) == 0 {
+		return nil
+	}
+	sessions := make([]*Session, len(orig))
+	copy(sessions, orig)
+	return sessions
 }
 
 // IsOnline checks if a user has any active sessions.
@@ -225,7 +232,9 @@ func (h *Hub) OnlineCount() int {
 // SendToUser sends a message to all sessions of a user.
 func (h *Hub) SendToUser(userID uuid.UUID, msg *ServerMessage) {
 	h.mu.RLock()
-	sessions := h.userSessions[userID]
+	orig := h.userSessions[userID]
+	sessions := make([]*Session, len(orig))
+	copy(sessions, orig)
 	h.mu.RUnlock()
 
 	for _, sess := range sessions {
