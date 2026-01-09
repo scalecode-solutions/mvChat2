@@ -45,9 +45,6 @@ type Session struct {
 	lang      string
 	ver       string
 
-	// Last activity timestamp (atomic access)
-	lastAction int64
-
 	// Closing state
 	closing int32
 	once    sync.Once
@@ -63,7 +60,6 @@ func NewSession(hub *Hub, conn *websocket.Conn, remoteAddr string, handlers *Han
 		handlers:    handlers,
 		remoteAddr:  remoteAddr,
 		rateLimiter: ratelimit.New(msgRateLimit, time.Second),
-		lastAction:  time.Now().UnixNano(),
 	}
 }
 
@@ -199,8 +195,6 @@ func (s *Session) readPump() {
 			}
 			break
 		}
-
-		atomic.StoreInt64(&s.lastAction, time.Now().UnixNano())
 
 		// Rate limit check
 		if !s.rateLimiter.Allow(s.id) {

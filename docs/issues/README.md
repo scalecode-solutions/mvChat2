@@ -129,7 +129,6 @@ None - all medium priority issues have been resolved.
 
 | Issue | File | Notes |
 |-------|------|-------|
-| lastAction field unused | session.go | Idle timeout not implemented |
 | Code duplication | various | ~250 lines could be refactored |
 | Missing godoc | various | 20+ exported types undocumented |
 
