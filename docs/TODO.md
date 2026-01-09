@@ -133,6 +133,31 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 {"id":"8","contact":{"user":"user-uuid","nickname":"My Lawyer"}}
 ```
 
+### Create Room
+```json
+{"id":"9","room":{"action":"create","desc":{"public":{"name":"Room Name"}}}}
+```
+
+### Invite to Room
+```json
+{"id":"10","room":{"id":"room-uuid","action":"invite","user":"user-uuid"}}
+```
+
+### Leave Room
+```json
+{"id":"11","room":{"id":"room-uuid","action":"leave"}}
+```
+
+### Kick from Room
+```json
+{"id":"12","room":{"id":"room-uuid","action":"kick","user":"user-uuid"}}
+```
+
+### Update Room
+```json
+{"id":"13","room":{"id":"room-uuid","action":"update","desc":{"public":{"name":"New Name"}}}}
+```
+
 ## Database Schema
 
 ### invite_codes
@@ -177,6 +202,11 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [x] **React Native SDK** - Full TypeScript SDK with hooks (useAuth, useMessages, useConversations, useContacts, useTyping)
 - [x] **SDK documentation** - Comprehensive docs in sdk/README.md
 
+### Rooms (January 2025)
+- [x] **Room management** - invite, leave, kick, update actions with role-based permissions
+- [x] **Role system** - owner/admin/member roles with permission hierarchy
+- [x] **Member broadcasts** - Real-time notifications for member_joined, member_left, member_kicked, room_updated
+
 ### Infrastructure
 - [x] **Rate limiting** - Caddy-based rate limiting (100 req/min API, 10 req/min auth)
 - [x] **WebSocket typing indicators** - Client-side debouncing (3s), not subject to HTTP rate limits
@@ -191,7 +221,7 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] SMS invite codes (alternative to email)
 - [ ] Message search (metadata only - sender, date, conversation)
 - [ ] User-controlled encrypted search index (client builds, encrypts, uploads; only user can search their own content)
-- [ ] Full room permissions (admin/kick/ban)
+- [x] Room management (invite/leave/kick/update with role-based permissions)
 - [ ] In-app audio calls (WebRTC without CallKit - stealth mode)
 - [ ] Webhooks (optional - for enterprise/professional integrations)
 - [ ] @mention notifications (special indicator when mentioned in rooms)
