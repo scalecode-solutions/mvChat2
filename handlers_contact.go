@@ -8,6 +8,10 @@ import (
 
 // HandleContact processes contact management requests.
 func (h *Handlers) HandleContact(s *Session, msg *ClientMessage) {
+	h.handleContact(s, msg)
+}
+
+func (h *Handlers) handleContact(s SessionInterface, msg *ClientMessage) {
 	if !s.RequireAuth(msg.ID) {
 		return
 	}
@@ -33,7 +37,7 @@ func (h *Handlers) HandleContact(s *Session, msg *ClientMessage) {
 	}
 }
 
-func (h *Handlers) handleAddContact(ctx context.Context, s *Session, msg *ClientMessage, userIDStr string) {
+func (h *Handlers) handleAddContact(ctx context.Context, s SessionInterface, msg *ClientMessage, userIDStr string) {
 	contactID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid user id"))
@@ -70,7 +74,7 @@ func (h *Handlers) handleAddContact(ctx context.Context, s *Session, msg *Client
 	}))
 }
 
-func (h *Handlers) handleRemoveContact(ctx context.Context, s *Session, msg *ClientMessage, userIDStr string) {
+func (h *Handlers) handleRemoveContact(ctx context.Context, s SessionInterface, msg *ClientMessage, userIDStr string) {
 	contactID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid user id"))
@@ -86,7 +90,7 @@ func (h *Handlers) handleRemoveContact(ctx context.Context, s *Session, msg *Cli
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 }
 
-func (h *Handlers) handleUpdateContactNickname(ctx context.Context, s *Session, msg *ClientMessage, userIDStr string, nickname *string) {
+func (h *Handlers) handleUpdateContactNickname(ctx context.Context, s SessionInterface, msg *ClientMessage, userIDStr string, nickname *string) {
 	contactID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid user id"))

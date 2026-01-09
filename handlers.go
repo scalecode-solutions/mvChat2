@@ -74,7 +74,7 @@ func (h *Handlers) broadcastToConv(ctx context.Context, convID uuid.UUID, info *
 
 // Handlers holds dependencies for request handlers.
 type Handlers struct {
-	db           *store.DB
+	db           store.Store
 	auth         *auth.Auth
 	hub          *Hub
 	encryptor    *crypto.Encryptor
@@ -84,7 +84,7 @@ type Handlers struct {
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(db *store.DB, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service, inviteTokens *crypto.InviteTokenGenerator, cfg *config.Config) *Handlers {
+func NewHandlers(db store.Store, a *auth.Auth, hub *Hub, enc *crypto.Encryptor, emailSvc *email.Service, inviteTokens *crypto.InviteTokenGenerator, cfg *config.Config) *Handlers {
 	return &Handlers{
 		db:           db,
 		auth:         a,
