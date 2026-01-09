@@ -10,3 +10,7 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS no_screenshots BOOLEAN NOT NU
 -- Mentions are stored in message head as {"mentions": [{"userId": "...", ...}]}
 -- We use a GIN index on the head JSONB for efficient querying
 CREATE INDEX IF NOT EXISTS idx_messages_head_mentions ON messages USING GIN ((head->'mentions'));
+
+-- Update schema version
+UPDATE schema_version SET version = 10 WHERE version = 9;
+INSERT INTO schema_version (version) SELECT 10 WHERE NOT EXISTS (SELECT 1 FROM schema_version WHERE version = 10);
