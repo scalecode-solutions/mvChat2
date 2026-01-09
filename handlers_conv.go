@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -570,6 +571,7 @@ func (h *Handlers) handleEdit(s SessionInterface, msg *ClientMessage) {
 	}
 
 	if err := h.db.EditMessage(ctx, convID, edit.Seq, content); err != nil {
+		slog.Error("edit message failed", "conv", convID, "seq", edit.Seq, "error", err)
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to edit"))
 		return
 	}

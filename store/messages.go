@@ -142,7 +142,7 @@ func (db *DB) EditMessage(ctx context.Context, convID uuid.UUID, seq int, conten
 	_, err := db.pool.Exec(ctx, `
 		UPDATE messages 
 		SET content = $3, updated_at = $4,
-			head = COALESCE(head, '{}'::jsonb) || jsonb_build_object('edit_count', COALESCE((head->>'edit_count')::int, 0) + 1, 'edited_at', $4)
+			head = COALESCE(head, '{}'::jsonb) || jsonb_build_object('edit_count', COALESCE((head->>'edit_count')::int, 0) + 1, 'edited_at', $4::timestamptz)
 		WHERE conversation_id = $1 AND seq = $2 AND deleted_at IS NULL
 	`, convID, seq, content, now)
 	return err
