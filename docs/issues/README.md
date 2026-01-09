@@ -14,11 +14,11 @@ Most critical and high-priority security issues have been resolved. The codebase
 |----------|----------|----------|-----------|
 | Security (Critical) | 3 | 3 | 0 |
 | Security (High) | 5 | 5 | 0 |
-| Security (Medium) | 6 | 2 | 4 |
+| Security (Medium) | 6 | 5 | 1 |
 | Database (Critical) | 2 | 2 | 0 |
-| Database (High) | 4 | 2 | 2 |
+| Database (High) | 4 | 4 | 0 |
 | WebSocket (Critical) | 3 | 3 | 0 |
-| WebSocket (High) | 4 | 1 | 3 |
+| WebSocket (High) | 4 | 4 | 0 |
 | Testing | 1 | 0 | 1 |
 
 ## Resolved Issues
@@ -80,6 +80,16 @@ Most critical and high-priority security issues have been resolved. The codebase
 | Multiple message types validation | FIXED | dispatch() validates exactly one type per request |
 | Connection leak on channel full | FIXED | Register/Unregister use non-blocking sends with goroutine fallback |
 
+### Quick Wins (Latest)
+
+| Issue | Status | Resolution |
+|-------|--------|------------|
+| Database SSL disabled by default | FIXED | Changed default from 'disable' to 'prefer' |
+| X-Forwarded-For spoofing | FIXED | Parse only first IP from header |
+| Hub lock released early | FIXED | GetUserSessions/SendToUser copy slices before unlock |
+| Silent WriteJSON errors | FIXED | Added logging for WebSocket write failures |
+| Redis errors silently ignored | FIXED | Added logging for SetOnline/SetOffline/RefreshOnline |
+
 ## Remaining Issues
 
 ### High Priority
@@ -90,20 +100,15 @@ None - all high priority issues have been resolved.
 
 | Issue | File | Notes |
 |-------|------|-------|
-| Database SSL disabled by default | config/config.go | Security hardening |
-| Missing X-Forwarded-For validation | server.go | IP spoofing possible |
 | Sensitive data in logs | various | PII in error messages |
 | Missing security headers | - | Handled by Caddy, but app could add them |
 | Reaction race condition | store/messages.go | Non-atomic JSONB update |
-| Hub lock released early | hub.go | Potential race with session pointers |
 
 ### Low Priority
 
 | Issue | File | Notes |
 |-------|------|-------|
 | lastAction field unused | session.go | Idle timeout not implemented |
-| Silent WriteJSON errors | session.go | Should log for debugging |
-| Redis errors silently ignored | hub.go, presence.go | Should log for monitoring |
 | Code duplication | various | ~250 lines could be refactored |
 | Missing godoc | various | 20+ exported types undocumented |
 
