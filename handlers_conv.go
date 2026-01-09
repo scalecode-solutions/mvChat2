@@ -99,6 +99,39 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 		return
 	}
 
+	// Handle disappearing TTL update (conversation-level setting)
+	if dm.DisappearingTTL != nil {
+		ttl := dm.DisappearingTTL
+		// Validate TTL values: 10, 30, 60, 300, 3600, 86400, 604800, or 0 to disable
+		validTTLs := map[int]bool{0: true, 10: true, 30: true, 60: true, 300: true, 3600: true, 86400: true, 604800: true}
+		if !validTTLs[*ttl] {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid TTL value"))
+			return
+		}
+
+		var ttlValue *int
+		if *ttl > 0 {
+			ttlValue = ttl
+		}
+		if err := h.db.UpdateConversationDisappearingTTL(ctx, convID, ttlValue); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update disappearing TTL"))
+			return
+		}
+
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"disappearingTTL": ttlValue,
+		}))
+
+		// Broadcast to members
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "disappearing_updated",
+			Ts:             time.Now().UTC(),
+		}, "")
+		return
+	}
+
 	// Build settings update
 	settings := store.MemberSettings{
 		Favorite: dm.Favorite,
@@ -353,6 +386,39 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 		return
 	}
 
+	// Handle disappearing TTL update
+	if room.DisappearingTTL != nil {
+		ttl := room.DisappearingTTL
+		// Validate TTL values: 10, 30, 60, 300, 3600, 86400, 604800, or 0 to disable
+		validTTLs := map[int]bool{0: true, 10: true, 30: true, 60: true, 300: true, 3600: true, 86400: true, 604800: true}
+		if !validTTLs[*ttl] {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid TTL value"))
+			return
+		}
+
+		var ttlValue *int
+		if *ttl > 0 {
+			ttlValue = ttl
+		}
+		if err := h.db.UpdateConversationDisappearingTTL(ctx, convID, ttlValue); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to update disappearing TTL"))
+			return
+		}
+
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"disappearingTTL": ttlValue,
+		}))
+
+		// Broadcast to members
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "disappearing_updated",
+			Ts:             time.Now().UTC(),
+		}, "")
+		return
+	}
+
 	// Get new public data
 	var public json.RawMessage
 	if room.Desc != nil {
@@ -479,6 +545,20 @@ func (h *Handlers) handleGetConversations(ctx context.Context, s SessionInterfac
 		} else if c.Type == "room" {
 			item["public"] = c.Public
 		}
+		// Disappearing messages TTL
+		if c.DisappearingTTL != nil {
+			item["disappearingTTL"] = *c.DisappearingTTL
+		}
+		// Pinned message info
+		if c.PinnedSeq != nil {
+			item["pinnedSeq"] = *c.PinnedSeq
+			if c.PinnedAt != nil {
+				item["pinnedAt"] = *c.PinnedAt
+			}
+			if c.PinnedBy != nil {
+				item["pinnedBy"] = c.PinnedBy.String()
+			}
+		}
 		results = append(results, item)
 	}
 
@@ -536,6 +616,10 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s SessionInterface, ms
 		}
 		if m.Head != nil {
 			item["head"] = m.Head
+		}
+		// View-once indicator
+		if m.ViewOnce {
+			item["viewOnce"] = true
 		}
 		results = append(results, item)
 	}
@@ -675,8 +759,33 @@ func (h *Handlers) handleSend(s SessionInterface, msg *ClientMessage) {
 
 	// Build head
 	var head json.RawMessage
+	headMap := make(map[string]any)
 	if send.ReplyTo > 0 {
-		head, _ = json.Marshal(map[string]any{"reply_to": send.ReplyTo})
+		headMap["reply_to"] = send.ReplyTo
+	}
+	if send.ViewOnce {
+		headMap["view_once"] = true
+		if send.ViewOnceTTL > 0 {
+			headMap["view_once_ttl"] = send.ViewOnceTTL
+		}
+	}
+	if len(headMap) > 0 {
+		head, _ = json.Marshal(headMap)
+	}
+
+	// Validate view-once TTL
+	var viewOnceTTL *int
+	if send.ViewOnce {
+		validTTLs := map[int]bool{10: true, 30: true, 60: true, 300: true, 3600: true, 86400: true, 604800: true}
+		if send.ViewOnceTTL > 0 && !validTTLs[send.ViewOnceTTL] {
+			s.Send(CtrlError(msg.ID, CodeBadRequest, "invalid view-once TTL"))
+			return
+		}
+		ttl := send.ViewOnceTTL
+		if ttl == 0 {
+			ttl = 10 // Default 10 seconds for view-once
+		}
+		viewOnceTTL = &ttl
 	}
 
 	// Encrypt content
@@ -686,26 +795,31 @@ func (h *Handlers) handleSend(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
-	// Create message
-	message, err := h.db.CreateMessage(ctx, convID, s.UserID(), content, head)
+	// Create message with view-once support
+	var message *store.Message
+	if send.ViewOnce {
+		message, err = h.db.CreateMessageWithViewOnce(ctx, convID, s.UserID(), content, head, true, viewOnceTTL)
+	} else {
+		message, err = h.db.CreateMessage(ctx, convID, s.UserID(), content, head)
+	}
 	if err != nil {
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to send"))
 		return
 	}
 
 	// Send confirmation to sender
-	s.Send(CtrlSuccess(msg.ID, CodeAccepted, map[string]any{
+	response := map[string]any{
 		"conv": convID.String(),
 		"seq":  message.Seq,
 		"ts":   message.CreatedAt,
-	}))
+	}
+	if send.ViewOnce {
+		response["viewOnce"] = true
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeAccepted, response))
 
 	// Broadcast to other members
 	memberIDs, _ := h.db.GetConversationMembers(ctx, convID)
-	var headMap map[string]any
-	if head != nil {
-		json.Unmarshal(head, &headMap)
-	}
 	dataMsg := &ServerMessage{
 		Data: &MsgServerData{
 			ConversationID: convID.String(),
@@ -1052,6 +1166,19 @@ func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
+	// Record message reads for disappearing/view-once message expiration
+	// Get messages from 1 to read.Seq that haven't been read yet
+	messages, err := h.db.GetMessages(ctx, convID, s.UserID(), read.Seq+1, read.Seq, 0)
+	if err == nil {
+		for _, m := range messages {
+			// Only track reads for messages from others (not own messages)
+			if m.FromUserID != s.UserID() {
+				// RecordMessageRead calculates expiration based on view-once or conversation TTL
+				h.db.RecordMessageRead(ctx, m.ID, s.UserID())
+			}
+		}
+	}
+
 	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
 
 	// Broadcast to members
@@ -1062,4 +1189,107 @@ func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 		Seq:            read.Seq,
 		Ts:             time.Now().UTC(),
 	}, s.ID())
+}
+
+// HandlePin processes pin/unpin message requests.
+func (h *Handlers) HandlePin(s *Session, msg *ClientMessage) {
+	h.handlePin(s, msg)
+}
+
+func (h *Handlers) handlePin(s SessionInterface, msg *ClientMessage) {
+	if !s.RequireAuth(msg.ID) {
+		return
+	}
+
+	pin := msg.Pin
+	if pin == nil || pin.ConversationID == "" {
+		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing pin data"))
+		return
+	}
+
+	ctx, cancel := handlerCtx()
+	defer cancel()
+
+	convID, ok := parseUUID(s, msg.ID, pin.ConversationID, "conv id")
+	if !ok {
+		return
+	}
+
+	// Check membership and get conversation type
+	conv, err := h.db.GetConversationByID(ctx, convID)
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if conv == nil {
+		s.Send(CtrlError(msg.ID, CodeNotFound, "conversation not found"))
+		return
+	}
+
+	// Check requester's role
+	role, err := h.db.GetMemberRole(ctx, convID, s.UserID())
+	if err != nil {
+		s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+		return
+	}
+	if role == "" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "not a member"))
+		return
+	}
+
+	// For rooms, only owner/admin can pin. For DMs, any member can pin.
+	if conv.Type == "room" && role != "owner" && role != "admin" {
+		s.Send(CtrlError(msg.ID, CodeForbidden, "only owner or admin can pin"))
+		return
+	}
+
+	now := time.Now().UTC()
+
+	if pin.Seq == 0 {
+		// Unpin
+		if err := h.db.SetPinnedMessage(ctx, convID, nil, s.UserID()); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to unpin"))
+			return
+		}
+
+		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+
+		// Broadcast unpin
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "unpin",
+			Ts:             now,
+		}, "")
+	} else {
+		// Pin - verify message exists
+		message, err := h.db.GetMessageBySeq(ctx, convID, pin.Seq)
+		if err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "database error"))
+			return
+		}
+		if message == nil {
+			s.Send(CtrlError(msg.ID, CodeNotFound, "message not found"))
+			return
+		}
+
+		if err := h.db.SetPinnedMessage(ctx, convID, &message.ID, s.UserID()); err != nil {
+			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to pin"))
+			return
+		}
+
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"seq":      pin.Seq,
+			"pinnedAt": now,
+		}))
+
+		// Broadcast pin
+		h.broadcastToConv(ctx, convID, &MsgServerInfo{
+			ConversationID: convID.String(),
+			From:           s.UserID().String(),
+			What:           "pin",
+			Seq:            pin.Seq,
+			Ts:             now,
+		}, "")
+	}
 }

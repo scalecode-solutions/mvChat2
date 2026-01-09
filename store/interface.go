@@ -61,6 +61,14 @@ type Store interface {
 	// Rooms
 	UpdateRoomPublic(ctx context.Context, convID uuid.UUID, public json.RawMessage) error
 
+	// Pinned messages
+	SetPinnedMessage(ctx context.Context, convID uuid.UUID, messageID *uuid.UUID, pinnedBy uuid.UUID) error
+	GetPinnedMessageSeq(ctx context.Context, convID uuid.UUID) (*int, error)
+
+	// Disappearing messages
+	UpdateConversationDisappearingTTL(ctx context.Context, convID uuid.UUID, ttl *int) error
+	GetConversationDisappearingTTL(ctx context.Context, convID uuid.UUID) (*int, error)
+
 	// Messages
 	CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
 	GetMessages(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
@@ -71,6 +79,14 @@ type Store interface {
 	DeleteMessageForUser(ctx context.Context, msgID, userID uuid.UUID) error
 	AddReaction(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
 	GetEditCount(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+
+	// View-once and message reads
+	CreateMessageWithViewOnce(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error)
+	RecordMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error)
+	GetMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error)
+	GetMessageByID(ctx context.Context, messageID uuid.UUID) (*Message, error)
+	IsMessageExpiredForUser(ctx context.Context, messageID, userID uuid.UUID) (bool, error)
+	ExpireReadMessages(ctx context.Context) (int64, error)
 
 	// Files
 	CreateFile(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)

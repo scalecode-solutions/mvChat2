@@ -28,6 +28,7 @@ type ClientMessage struct {
 	Read    *MsgClientRead    `json:"read,omitempty"`
 	Invite  *MsgClientInvite  `json:"invite,omitempty"`
 	Contact *MsgClientContact `json:"contact,omitempty"`
+	Pin     *MsgClientPin     `json:"pin,omitempty"`
 }
 
 // ServerMessage is a message from server to client.
@@ -97,6 +98,8 @@ type MsgClientDM struct {
 	Muted    *bool           `json:"muted,omitempty"`
 	Blocked  *bool           `json:"blocked,omitempty"`
 	Private  json.RawMessage `json:"private,omitempty"`
+	// Disappearing messages TTL in seconds (nil = no change, 0 = disable)
+	DisappearingTTL *int `json:"disappearingTTL,omitempty"`
 }
 
 // MsgClientRoom is for room management.
@@ -109,6 +112,8 @@ type MsgClientRoom struct {
 	User string `json:"user,omitempty"`
 	// For create/update
 	Desc *MsgSetDesc `json:"desc,omitempty"`
+	// Disappearing messages TTL in seconds (nil = no change, 0 = disable)
+	DisappearingTTL *int `json:"disappearingTTL,omitempty"`
 }
 
 // MsgClientSend is for sending a message.
@@ -117,6 +122,10 @@ type MsgClientSend struct {
 	Content        json.RawMessage `json:"content"` // Irido format
 	// Optional: reply to message seq
 	ReplyTo int `json:"replyTo,omitempty"`
+	// View-once message: disappears after recipient views it
+	ViewOnce bool `json:"viewOnce,omitempty"`
+	// TTL in seconds after viewing: 10, 30, 60, 300, 3600, 86400, 604800
+	ViewOnceTTL int `json:"viewOnceTTL,omitempty"`
 }
 
 // MsgClientGet is for fetching data.
@@ -240,6 +249,13 @@ type MsgClientContact struct {
 	Nickname *string `json:"nickname,omitempty"`
 }
 
+// MsgClientPin is for pinning/unpinning messages.
+type MsgClientPin struct {
+	ConversationID string `json:"conv"`
+	// Seq of message to pin (0 or omit to unpin)
+	Seq int `json:"seq,omitempty"`
+}
+
 // ============================================================================
 // Response Helpers
 // ============================================================================
@@ -311,4 +327,10 @@ type ConversationInfo struct {
 	Muted     bool            `json:"muted,omitempty"`
 	// For DMs: the other user
 	User *UserInfo `json:"user,omitempty"`
+	// Disappearing messages TTL in seconds (nil = disabled)
+	DisappearingTTL *int `json:"disappearingTTL,omitempty"`
+	// Pinned message info
+	PinnedSeq *int       `json:"pinnedSeq,omitempty"`
+	PinnedAt  *time.Time `json:"pinnedAt,omitempty"`
+	PinnedBy  *string    `json:"pinnedBy,omitempty"`
 }

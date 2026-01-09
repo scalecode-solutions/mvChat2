@@ -21,6 +21,12 @@ type Conversation struct {
 	LastSeq   int             `json:"lastSeq"`
 	LastMsgAt *time.Time      `json:"lastMsgAt,omitempty"`
 	DelID     int             `json:"delId"`
+	// Disappearing messages TTL in seconds (nil = disabled)
+	DisappearingTTL *int `json:"disappearingTTL,omitempty"`
+	// Pinned message info
+	PinnedMessageID *uuid.UUID `json:"pinnedMessageId,omitempty"`
+	PinnedAt        *time.Time `json:"pinnedAt,omitempty"`
+	PinnedBy        *uuid.UUID `json:"pinnedBy,omitempty"`
 }
 
 // Member represents a user's membership in a conversation.
@@ -56,6 +62,8 @@ type ConversationWithMember struct {
 	Private         json.RawMessage `json:"private,omitempty"`
 	// For DMs: the other user's info
 	OtherUser *User `json:"otherUser,omitempty"`
+	// Pinned message seq (resolved from pinned_message_id)
+	PinnedSeq *int `json:"pinnedSeq,omitempty"`
 }
 
 // CreateDM creates a new DM conversation between two users.
@@ -180,9 +188,12 @@ func (db *DB) CreateRoom(ctx context.Context, ownerID uuid.UUID, public json.Raw
 func (db *DB) GetConversationByID(ctx context.Context, id uuid.UUID) (*Conversation, error) {
 	var conv Conversation
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, created_at, updated_at, type, owner_id, public, last_seq, last_msg_at, del_id
+		SELECT id, created_at, updated_at, type, owner_id, public, last_seq, last_msg_at, del_id,
+			disappearing_ttl, pinned_message_id, pinned_at, pinned_by
 		FROM conversations WHERE id = $1
-	`, id).Scan(&conv.ID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Type, &conv.OwnerID, &conv.Public, &conv.LastSeq, &conv.LastMsgAt, &conv.DelID)
+	`, id).Scan(&conv.ID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Type, &conv.OwnerID, &conv.Public,
+		&conv.LastSeq, &conv.LastMsgAt, &conv.DelID,
+		&conv.DisappearingTTL, &conv.PinnedMessageID, &conv.PinnedAt, &conv.PinnedBy)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -219,10 +230,13 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 	rows, err := db.pool.Query(ctx, `
 		SELECT
 			c.id, c.created_at, c.updated_at, c.type, c.owner_id, c.public, c.last_seq, c.last_msg_at, c.del_id,
+			c.disappearing_ttl, c.pinned_message_id, c.pinned_at, c.pinned_by,
 			m.created_at, m.updated_at, m.role, m.read_seq, m.recv_seq, m.clear_seq, m.favorite, m.muted, m.blocked, m.private,
 			-- DM other user fields (NULL for rooms)
 			ou.id, ou.created_at, ou.updated_at, ou.state, ou.public, ou.last_seen, ou.user_agent,
-			ou.must_change_password, ou.email, ou.email_verified
+			ou.must_change_password, ou.email, ou.email_verified,
+			-- Pinned message seq (NULL if no pinned message)
+			pm.seq
 		FROM conversations c
 		JOIN members m ON c.id = m.conversation_id
 		-- LEFT JOIN to get other user for DMs
@@ -231,6 +245,8 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 			WHEN dp.user1_id = $1 THEN dp.user2_id
 			ELSE dp.user1_id
 		END AND ou.state != 'deleted'
+		-- LEFT JOIN to get pinned message seq
+		LEFT JOIN messages pm ON pm.id = c.pinned_message_id
 		WHERE m.user_id = $1 AND m.deleted_at IS NULL
 		ORDER BY COALESCE(c.last_msg_at, c.created_at) DESC
 	`, userID)
@@ -260,12 +276,16 @@ func (db *DB) GetUserConversations(ctx context.Context, userID uuid.UUID) ([]Con
 			&cwm.Conversation.ID, &cwm.Conversation.CreatedAt, &cwm.Conversation.UpdatedAt,
 			&cwm.Conversation.Type, &cwm.Conversation.OwnerID, &cwm.Conversation.Public,
 			&cwm.Conversation.LastSeq, &cwm.Conversation.LastMsgAt, &cwm.Conversation.DelID,
+			&cwm.Conversation.DisappearingTTL, &cwm.Conversation.PinnedMessageID,
+			&cwm.Conversation.PinnedAt, &cwm.Conversation.PinnedBy,
 			&cwm.MemberCreatedAt, &cwm.MemberUpdatedAt, &cwm.Role,
 			&cwm.ReadSeq, &cwm.RecvSeq, &cwm.ClearSeq,
 			&cwm.Favorite, &cwm.Muted, &cwm.Blocked, &cwm.Private,
 			// Other user fields (nullable)
 			&ouID, &ouCreatedAt, &ouUpdatedAt, &ouState, &ouPublic,
 			&ouLastSeen, &ouUserAgent, &ouMustChangePassword, &ouEmail, &ouEmailVerified,
+			// Pinned message seq
+			&cwm.PinnedSeq,
 		); err != nil {
 			return nil, err
 		}
@@ -471,4 +491,66 @@ func (db *DB) UpdateRoomPublic(ctx context.Context, convID uuid.UUID, public jso
 		WHERE id = $1 AND type = 'room'
 	`, convID, public, now)
 	return err
+}
+
+// SetPinnedMessage sets or clears the pinned message for a conversation.
+// Pass messageID as nil to unpin.
+func (db *DB) SetPinnedMessage(ctx context.Context, convID uuid.UUID, messageID *uuid.UUID, pinnedBy uuid.UUID) error {
+	now := time.Now().UTC()
+	if messageID == nil {
+		// Unpin
+		_, err := db.pool.Exec(ctx, `
+			UPDATE conversations
+			SET pinned_message_id = NULL, pinned_at = NULL, pinned_by = NULL, updated_at = $2
+			WHERE id = $1
+		`, convID, now)
+		return err
+	}
+	// Pin
+	_, err := db.pool.Exec(ctx, `
+		UPDATE conversations
+		SET pinned_message_id = $2, pinned_at = $3, pinned_by = $4, updated_at = $3
+		WHERE id = $1
+	`, convID, messageID, now, pinnedBy)
+	return err
+}
+
+// GetPinnedMessageSeq returns the seq of the pinned message, or nil if no message is pinned.
+func (db *DB) GetPinnedMessageSeq(ctx context.Context, convID uuid.UUID) (*int, error) {
+	var seq *int
+	err := db.pool.QueryRow(ctx, `
+		SELECT m.seq FROM conversations c
+		JOIN messages m ON m.id = c.pinned_message_id
+		WHERE c.id = $1
+	`, convID).Scan(&seq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return seq, nil
+}
+
+// UpdateConversationDisappearingTTL sets or clears the disappearing messages TTL.
+// Pass ttl as nil to disable disappearing messages.
+func (db *DB) UpdateConversationDisappearingTTL(ctx context.Context, convID uuid.UUID, ttl *int) error {
+	now := time.Now().UTC()
+	_, err := db.pool.Exec(ctx, `
+		UPDATE conversations SET disappearing_ttl = $2, updated_at = $3
+		WHERE id = $1
+	`, convID, ttl, now)
+	return err
+}
+
+// GetConversationDisappearingTTL returns the disappearing TTL for a conversation.
+func (db *DB) GetConversationDisappearingTTL(ctx context.Context, convID uuid.UUID) (*int, error) {
+	var ttl *int
+	err := db.pool.QueryRow(ctx, `
+		SELECT disappearing_ttl FROM conversations WHERE id = $1
+	`, convID).Scan(&ttl)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return ttl, err
 }

@@ -158,6 +158,32 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 {"id":"13","room":{"id":"room-uuid","action":"update","desc":{"public":{"name":"New Name"}}}}
 ```
 
+### Set Disappearing Messages (DM)
+```json
+{"id":"14","dm":{"conv":"dm-uuid","disappearingTTL":86400}}
+```
+TTL options: 10, 30, 60, 300, 3600, 86400, 604800 seconds (or 0 to disable)
+
+### Set Disappearing Messages (Room)
+```json
+{"id":"15","room":{"id":"room-uuid","action":"update","disappearingTTL":3600}}
+```
+
+### Pin Message
+```json
+{"id":"16","pin":{"conv":"conv-uuid","seq":42}}
+```
+
+### Unpin Message
+```json
+{"id":"17","pin":{"conv":"conv-uuid","seq":0}}
+```
+
+### Send View-Once Message
+```json
+{"id":"18","send":{"conv":"conv-uuid","content":"...","viewOnce":true,"viewOnceTTL":30}}
+```
+
 ## Database Schema
 
 ### invite_codes
@@ -231,8 +257,9 @@ mvChat2 is a secure chat backend for Clingy, a DV survivor support app disguised
 - [ ] Admin endpoints for user management
 - [ ] User language preference in profile (for client-side translation)
 - [ ] Scheduled messages (send at future time)
-- [ ] Pinned messages in rooms
-- [ ] Disappearing messages (auto soft-delete after X time)
+- [x] Pinned messages (one per conversation, any member in DM, owner/admin in rooms)
+- [x] Disappearing messages (per-conversation TTL: 10s, 30s, 1m, 5m, 1h, 24h, 7d)
+- [x] View-once messages (sender-controlled TTL, expires after recipient reads)
 - [x] Unsend time limit enforcement (5 minutes)
 - [ ] Delete for everyone (separate from unsend, no time limit)
 - [x] Edit limits (10 edits per message within 15 minutes, then locked)

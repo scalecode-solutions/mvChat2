@@ -301,6 +301,9 @@ func (s *Session) dispatch(msg *ClientMessage) {
 	if msg.Contact != nil {
 		typeCount++
 	}
+	if msg.Pin != nil {
+		typeCount++
+	}
 
 	if typeCount == 0 {
 		s.Send(CtrlError(msg.ID, CodeBadRequest, "missing message type"))
@@ -350,6 +353,8 @@ func (s *Session) dispatch(msg *ClientMessage) {
 		s.handleInvite(msg)
 	case msg.Contact != nil:
 		s.handleContact(msg)
+	case msg.Pin != nil:
+		s.handlePin(msg)
 	}
 }
 
@@ -429,4 +434,8 @@ func (s *Session) handleInvite(msg *ClientMessage) {
 
 func (s *Session) handleContact(msg *ClientMessage) {
 	s.handlers.HandleContact(s, msg)
+}
+
+func (s *Session) handlePin(msg *ClientMessage) {
+	s.handlers.HandlePin(s, msg)
 }

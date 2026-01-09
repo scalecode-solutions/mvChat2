@@ -21,6 +21,9 @@ type Message struct {
 	Content        []byte          `json:"content"` // Encrypted Irido content
 	Head           json.RawMessage `json:"head,omitempty"`
 	DeletedAt      *time.Time      `json:"deletedAt,omitempty"`
+	// View-once message support
+	ViewOnce    bool `json:"viewOnce,omitempty"`
+	ViewOnceTTL *int `json:"viewOnceTTL,omitempty"` // seconds: 10, 30, 60, 300, 3600, 86400, 604800
 }
 
 // MessageDeletion represents a soft delete for a specific user.
@@ -80,6 +83,7 @@ func (db *DB) CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, c
 
 // GetMessages retrieves messages from a conversation with pagination.
 // Returns messages with seq < before, limited to limit count, ordered by seq DESC.
+// Excludes messages that have expired for the requesting user.
 func (db *DB) GetMessages(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
@@ -90,24 +94,28 @@ func (db *DB) GetMessages(ctx context.Context, convID, userID uuid.UUID, before,
 
 	if before > 0 {
 		query = `
-			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at
+			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at, m.view_once, m.view_once_ttl
 			FROM messages m
 			LEFT JOIN message_deletions md ON m.id = md.message_id AND md.user_id = $2
-			WHERE m.conversation_id = $1 
+			LEFT JOIN message_reads mr ON m.id = mr.message_id AND mr.user_id = $2
+			WHERE m.conversation_id = $1
 			AND m.seq > $5
 			AND m.seq < $4
 			AND md.message_id IS NULL
+			AND (mr.expired IS NULL OR mr.expired = FALSE)
 			ORDER BY m.seq DESC LIMIT $3
 		`
 		args = []any{convID, userID, limit, before, clearSeq}
 	} else {
 		query = `
-			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at
+			SELECT m.id, m.conversation_id, m.seq, m.from_user_id, m.created_at, m.updated_at, m.content, m.head, m.deleted_at, m.view_once, m.view_once_ttl
 			FROM messages m
 			LEFT JOIN message_deletions md ON m.id = md.message_id AND md.user_id = $2
-			WHERE m.conversation_id = $1 
+			LEFT JOIN message_reads mr ON m.id = mr.message_id AND mr.user_id = $2
+			WHERE m.conversation_id = $1
 			AND m.seq > $4
 			AND md.message_id IS NULL
+			AND (mr.expired IS NULL OR mr.expired = FALSE)
 			ORDER BY m.seq DESC LIMIT $3
 		`
 		args = []any{convID, userID, limit, clearSeq}
@@ -123,7 +131,8 @@ func (db *DB) GetMessages(ctx context.Context, convID, userID uuid.UUID, before,
 	for rows.Next() {
 		var msg Message
 		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Seq, &msg.FromUserID,
-			&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt); err != nil {
+			&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt,
+			&msg.ViewOnce, &msg.ViewOnceTTL); err != nil {
 			return nil, err
 		}
 		messages = append(messages, msg)
@@ -135,10 +144,11 @@ func (db *DB) GetMessages(ctx context.Context, convID, userID uuid.UUID, before,
 func (db *DB) GetMessageBySeq(ctx context.Context, convID uuid.UUID, seq int) (*Message, error) {
 	var msg Message
 	err := db.pool.QueryRow(ctx, `
-		SELECT id, conversation_id, seq, from_user_id, created_at, updated_at, content, head, deleted_at
+		SELECT id, conversation_id, seq, from_user_id, created_at, updated_at, content, head, deleted_at, view_once, view_once_ttl
 		FROM messages WHERE conversation_id = $1 AND seq = $2
 	`, convID, seq).Scan(&msg.ID, &msg.ConversationID, &msg.Seq, &msg.FromUserID,
-		&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt)
+		&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt,
+		&msg.ViewOnce, &msg.ViewOnceTTL)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -296,4 +306,187 @@ func (db *DB) GetEditCount(ctx context.Context, convID uuid.UUID, seq int) (int,
 		return int(count), nil
 	}
 	return 0, nil
+}
+
+// CreateMessageWithViewOnce creates a new message with optional view-once settings.
+func (db *DB) CreateMessageWithViewOnce(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error) {
+	now := time.Now().UTC()
+	msgID := uuid.New()
+
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Get next sequence number and update conversation
+	var seq int
+	err = tx.QueryRow(ctx, `
+		UPDATE conversations
+		SET last_seq = last_seq + 1, last_msg_at = $2, updated_at = $2
+		WHERE id = $1
+		RETURNING last_seq
+	`, convID, now).Scan(&seq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Insert message with view_once fields
+	_, err = tx.Exec(ctx, `
+		INSERT INTO messages (id, conversation_id, seq, from_user_id, created_at, updated_at, content, head, view_once, view_once_ttl)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, msgID, convID, seq, fromUserID, now, now, content, head, viewOnce, viewOnceTTL)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &Message{
+		ID:             msgID,
+		ConversationID: convID,
+		Seq:            seq,
+		FromUserID:     fromUserID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		Content:        content,
+		Head:           head,
+		ViewOnce:       viewOnce,
+		ViewOnceTTL:    viewOnceTTL,
+	}, nil
+}
+
+// MessageRead represents a user's read of a specific message.
+type MessageRead struct {
+	MessageID uuid.UUID
+	UserID    uuid.UUID
+	ReadAt    time.Time
+	ExpiresAt *time.Time
+	Expired   bool
+}
+
+// RecordMessageRead records that a user has read a message and calculates expiration.
+// For view-once messages, uses the message's view_once_ttl.
+// For conversation disappearing messages, uses the conversation's disappearing_ttl.
+func (db *DB) RecordMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error) {
+	now := time.Now().UTC()
+
+	// Get message info and conversation TTL in one query
+	var viewOnce bool
+	var viewOnceTTL *int
+	var convDisappearingTTL *int
+	var fromUserID uuid.UUID
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT m.view_once, m.view_once_ttl, c.disappearing_ttl, m.from_user_id
+		FROM messages m
+		JOIN conversations c ON c.id = m.conversation_id
+		WHERE m.id = $1
+	`, messageID).Scan(&viewOnce, &viewOnceTTL, &convDisappearingTTL, &fromUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Don't track reads for sender's own messages
+	if fromUserID == userID {
+		return nil, nil
+	}
+
+	// Calculate expires_at based on TTL
+	var expiresAt *time.Time
+	if viewOnce && viewOnceTTL != nil {
+		t := now.Add(time.Duration(*viewOnceTTL) * time.Second)
+		expiresAt = &t
+	} else if convDisappearingTTL != nil {
+		t := now.Add(time.Duration(*convDisappearingTTL) * time.Second)
+		expiresAt = &t
+	}
+
+	// Upsert the read record (don't update if already exists - first read wins)
+	_, err = db.pool.Exec(ctx, `
+		INSERT INTO message_reads (message_id, user_id, read_at, expires_at, expired)
+		VALUES ($1, $2, $3, $4, FALSE)
+		ON CONFLICT (message_id, user_id) DO NOTHING
+	`, messageID, userID, now, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MessageRead{
+		MessageID: messageID,
+		UserID:    userID,
+		ReadAt:    now,
+		ExpiresAt: expiresAt,
+		Expired:   false,
+	}, nil
+}
+
+// GetMessageRead returns the read record for a user and message.
+func (db *DB) GetMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error) {
+	var mr MessageRead
+	err := db.pool.QueryRow(ctx, `
+		SELECT message_id, user_id, read_at, expires_at, expired
+		FROM message_reads
+		WHERE message_id = $1 AND user_id = $2
+	`, messageID, userID).Scan(&mr.MessageID, &mr.UserID, &mr.ReadAt, &mr.ExpiresAt, &mr.Expired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &mr, nil
+}
+
+// ExpireReadMessages marks messages as expired for users whose TTL has passed.
+// Returns the number of messages expired.
+func (db *DB) ExpireReadMessages(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
+	result, err := db.pool.Exec(ctx, `
+		UPDATE message_reads
+		SET expired = TRUE
+		WHERE expires_at IS NOT NULL
+		AND expires_at <= $1
+		AND NOT expired
+	`, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+// IsMessageExpiredForUser checks if a message has expired for a specific user.
+func (db *DB) IsMessageExpiredForUser(ctx context.Context, messageID, userID uuid.UUID) (bool, error) {
+	var expired bool
+	err := db.pool.QueryRow(ctx, `
+		SELECT expired FROM message_reads
+		WHERE message_id = $1 AND user_id = $2
+	`, messageID, userID).Scan(&expired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil // Not read yet, so not expired
+	}
+	if err != nil {
+		return false, err
+	}
+	return expired, nil
+}
+
+// GetMessageByID retrieves a message by its ID.
+func (db *DB) GetMessageByID(ctx context.Context, messageID uuid.UUID) (*Message, error) {
+	var msg Message
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, conversation_id, seq, from_user_id, created_at, updated_at, content, head, deleted_at, view_once, view_once_ttl
+		FROM messages WHERE id = $1
+	`, messageID).Scan(&msg.ID, &msg.ConversationID, &msg.Seq, &msg.FromUserID,
+		&msg.CreatedAt, &msg.UpdatedAt, &msg.Content, &msg.Head, &msg.DeletedAt, &msg.ViewOnce, &msg.ViewOnceTTL)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &msg, nil
 }

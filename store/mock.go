@@ -57,6 +57,14 @@ type MockStore struct {
 	// Rooms
 	UpdateRoomPublicFn func(ctx context.Context, convID uuid.UUID, public json.RawMessage) error
 
+	// Pinned messages
+	SetPinnedMessageFn    func(ctx context.Context, convID uuid.UUID, messageID *uuid.UUID, pinnedBy uuid.UUID) error
+	GetPinnedMessageSeqFn func(ctx context.Context, convID uuid.UUID) (*int, error)
+
+	// Disappearing messages
+	UpdateConversationDisappearingTTLFn func(ctx context.Context, convID uuid.UUID, ttl *int) error
+	GetConversationDisappearingTTLFn    func(ctx context.Context, convID uuid.UUID) (*int, error)
+
 	// Messages
 	CreateMessageFn            func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error)
 	GetMessagesFn              func(ctx context.Context, convID, userID uuid.UUID, before, limit int, clearSeq int) ([]Message, error)
@@ -67,6 +75,14 @@ type MockStore struct {
 	DeleteMessageForUserFn     func(ctx context.Context, msgID, userID uuid.UUID) error
 	AddReactionFn              func(ctx context.Context, convID uuid.UUID, seq int, userID uuid.UUID, emoji string) error
 	GetEditCountFn             func(ctx context.Context, convID uuid.UUID, seq int) (int, error)
+
+	// View-once and message reads
+	CreateMessageWithViewOnceFn func(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error)
+	RecordMessageReadFn         func(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error)
+	GetMessageReadFn            func(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error)
+	GetMessageByIDFn            func(ctx context.Context, messageID uuid.UUID) (*Message, error)
+	IsMessageExpiredForUserFn   func(ctx context.Context, messageID, userID uuid.UUID) (bool, error)
+	ExpireReadMessagesFn        func(ctx context.Context) (int64, error)
 
 	// Files
 	CreateFileFn          func(ctx context.Context, uploaderID uuid.UUID, mimeType string, size int64, location string) (*File, error)
@@ -344,6 +360,34 @@ func (m *MockStore) UpdateRoomPublic(ctx context.Context, convID uuid.UUID, publ
 	return nil
 }
 
+func (m *MockStore) SetPinnedMessage(ctx context.Context, convID uuid.UUID, messageID *uuid.UUID, pinnedBy uuid.UUID) error {
+	if m.SetPinnedMessageFn != nil {
+		return m.SetPinnedMessageFn(ctx, convID, messageID, pinnedBy)
+	}
+	return nil
+}
+
+func (m *MockStore) GetPinnedMessageSeq(ctx context.Context, convID uuid.UUID) (*int, error) {
+	if m.GetPinnedMessageSeqFn != nil {
+		return m.GetPinnedMessageSeqFn(ctx, convID)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) UpdateConversationDisappearingTTL(ctx context.Context, convID uuid.UUID, ttl *int) error {
+	if m.UpdateConversationDisappearingTTLFn != nil {
+		return m.UpdateConversationDisappearingTTLFn(ctx, convID, ttl)
+	}
+	return nil
+}
+
+func (m *MockStore) GetConversationDisappearingTTL(ctx context.Context, convID uuid.UUID) (*int, error) {
+	if m.GetConversationDisappearingTTLFn != nil {
+		return m.GetConversationDisappearingTTLFn(ctx, convID)
+	}
+	return nil, nil
+}
+
 func (m *MockStore) CreateMessage(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage) (*Message, error) {
 	if m.CreateMessageFn != nil {
 		return m.CreateMessageFn(ctx, convID, fromUserID, content, head)
@@ -403,6 +447,48 @@ func (m *MockStore) AddReaction(ctx context.Context, convID uuid.UUID, seq int, 
 func (m *MockStore) GetEditCount(ctx context.Context, convID uuid.UUID, seq int) (int, error) {
 	if m.GetEditCountFn != nil {
 		return m.GetEditCountFn(ctx, convID, seq)
+	}
+	return 0, nil
+}
+
+func (m *MockStore) CreateMessageWithViewOnce(ctx context.Context, convID, fromUserID uuid.UUID, content []byte, head json.RawMessage, viewOnce bool, viewOnceTTL *int) (*Message, error) {
+	if m.CreateMessageWithViewOnceFn != nil {
+		return m.CreateMessageWithViewOnceFn(ctx, convID, fromUserID, content, head, viewOnce, viewOnceTTL)
+	}
+	return &Message{ID: uuid.New(), ConversationID: convID, FromUserID: fromUserID, Seq: 1, ViewOnce: viewOnce, ViewOnceTTL: viewOnceTTL}, nil
+}
+
+func (m *MockStore) RecordMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error) {
+	if m.RecordMessageReadFn != nil {
+		return m.RecordMessageReadFn(ctx, messageID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetMessageRead(ctx context.Context, messageID, userID uuid.UUID) (*MessageRead, error) {
+	if m.GetMessageReadFn != nil {
+		return m.GetMessageReadFn(ctx, messageID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetMessageByID(ctx context.Context, messageID uuid.UUID) (*Message, error) {
+	if m.GetMessageByIDFn != nil {
+		return m.GetMessageByIDFn(ctx, messageID)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) IsMessageExpiredForUser(ctx context.Context, messageID, userID uuid.UUID) (bool, error) {
+	if m.IsMessageExpiredForUserFn != nil {
+		return m.IsMessageExpiredForUserFn(ctx, messageID, userID)
+	}
+	return false, nil
+}
+
+func (m *MockStore) ExpireReadMessages(ctx context.Context) (int64, error) {
+	if m.ExpireReadMessagesFn != nil {
+		return m.ExpireReadMessagesFn(ctx)
 	}
 	return 0, nil
 }
