@@ -550,6 +550,7 @@ function LoginScreen() {
     user,
     userID,
     mustChangePassword,
+    emailVerified,
     isLoading,
     error,
     login,
@@ -557,6 +558,9 @@ function LoginScreen() {
     signup,
     logout,
     changePassword,
+    updateProfile,
+    updatePrivateData,
+    updateEmail,
   } = useAuth(client);
 
   const handleLogin = async () => {
@@ -593,6 +597,7 @@ function ConversationList() {
     setRoomDisappearingTTL,
     pinMessage,
     unpinMessage,
+    clearConversation,
   } = useConversations(client);
 
   return (
@@ -617,17 +622,18 @@ function ChatScreen({ conversationId }) {
     isLoading,
     hasMore,
     loadMore,
-    send,
-    edit,
-    unsend,
+    sendMessage,
+    editMessage,
+    unsendMessage,
     deleteForEveryone,
     deleteForMe,
     react,
     markRead,
+    markReceived,
   } = useMessages(client, conversationId);
 
   const handleSend = async (text) => {
-    await send({ text });
+    await sendMessage({ text });
   };
 
   return (
@@ -684,6 +690,68 @@ function ChatInput({ conversationId }) {
         <Text>{typingUsers.join(', ')} typing...</Text>
       )}
       <TextInput onChangeText={handleTextChange} />
+    </View>
+  );
+}
+```
+
+### useInvites
+
+```typescript
+import { useInvites } from '@mvchat/react-native-sdk';
+
+function InviteManagement() {
+  const {
+    invites,
+    isLoading,
+    error,
+    refresh,
+    createInvite,
+    revokeInvite,
+    redeemInvite,
+  } = useInvites(client);
+
+  const handleCreateInvite = async (email, name) => {
+    const { id, code, expiresAt } = await createInvite(email, name);
+    console.log('Invite created:', code);
+  };
+
+  const handleRedeem = async (code) => {
+    const { inviter, inviterPublic, conv } = await redeemInvite(code);
+    console.log('Invite redeemed, DM created:', conv);
+  };
+
+  return (
+    <FlatList
+      data={invites}
+      renderItem={({ item }) => (
+        <InviteItem
+          invite={item}
+          onRevoke={() => revokeInvite(item.id)}
+        />
+      )}
+    />
+  );
+}
+```
+
+### usePresence
+
+```typescript
+import { usePresence } from '@mvchat/react-native-sdk';
+
+function OnlineStatus({ userId }) {
+  const { getPresence, isOnline } = usePresence(client);
+
+  const presence = getPresence(userId);
+  const online = isOnline(userId);
+
+  return (
+    <View>
+      <Text>{online ? 'Online' : 'Offline'}</Text>
+      {!online && presence?.lastSeen && (
+        <Text>Last seen: {presence.lastSeen}</Text>
+      )}
     </View>
   );
 }

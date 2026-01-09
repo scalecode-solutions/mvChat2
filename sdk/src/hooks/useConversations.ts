@@ -22,6 +22,8 @@ export interface UseConversationsResult {
   // Pinned messages
   pinMessage: (convId: string, seq: number) => Promise<void>;
   unpinMessage: (convId: string) => Promise<void>;
+  // Clear conversation history
+  clearConversation: (convId: string, seq: number) => Promise<void>;
 }
 
 export function useConversations(client: MVChat2Client): UseConversationsResult {
@@ -161,6 +163,14 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
     [client, refresh]
   );
 
+  const clearConversation = useCallback(
+    async (convId: string, seq: number) => {
+      await client.clearConversation(convId, seq);
+      await refresh();
+    },
+    [client, refresh]
+  );
+
   return {
     conversations,
     isLoading,
@@ -177,5 +187,6 @@ export function useConversations(client: MVChat2Client): UseConversationsResult 
     setRoomDisappearingTTL,
     pinMessage,
     unpinMessage,
+    clearConversation,
   };
 }

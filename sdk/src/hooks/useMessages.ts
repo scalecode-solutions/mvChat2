@@ -14,6 +14,8 @@ export interface UseMessagesResult {
   deleteForEveryone: (seq: number) => Promise<void>;
   deleteForMe: (seq: number) => Promise<void>;
   react: (seq: number, emoji: string) => Promise<void>;
+  markRead: (seq: number) => Promise<void>;
+  markReceived: (seq: number) => Promise<void>;
 }
 
 export function useMessages(client: MVChat2Client, conversationId: string): UseMessagesResult {
@@ -85,16 +87,50 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
       }
     };
 
+    const handleReact = (event: { conv: string; seq: number; from: string; emoji: string }) => {
+      if (event.conv === conversationId) {
+        setMessages((prev: Message[]) =>
+          prev.map((m: Message) => {
+            if (m.seq === event.seq) {
+              // Update reactions in head
+              const head = { ...(m.head || {}) };
+              const reactions = { ...(head.reactions || {}) };
+
+              // Toggle reaction: if same user already reacted with this emoji, remove it
+              if (reactions[event.emoji]?.includes(event.from)) {
+                reactions[event.emoji] = reactions[event.emoji].filter((u: string) => u !== event.from);
+                if (reactions[event.emoji].length === 0) {
+                  delete reactions[event.emoji];
+                }
+              } else {
+                // Add reaction
+                if (!reactions[event.emoji]) {
+                  reactions[event.emoji] = [];
+                }
+                reactions[event.emoji] = [...reactions[event.emoji], event.from];
+              }
+
+              head.reactions = Object.keys(reactions).length > 0 ? reactions : undefined;
+              return { ...m, head };
+            }
+            return m;
+          })
+        );
+      }
+    };
+
     client.on('message', handleMessage);
     client.on('edit', handleEdit);
     client.on('unsend', handleUnsend);
     client.on('deleteForEveryone', handleDelete);
+    client.on('react', handleReact);
 
     return () => {
       client.off('message', handleMessage);
       client.off('edit', handleEdit);
       client.off('unsend', handleUnsend);
       client.off('deleteForEveryone', handleDelete);
+      client.off('react', handleReact);
     };
   }, [client, conversationId]);
 
@@ -159,6 +195,20 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
     [client, conversationId]
   );
 
+  const markRead = useCallback(
+    async (seq: number) => {
+      await client.markRead(conversationId, seq);
+    },
+    [client, conversationId]
+  );
+
+  const markReceived = useCallback(
+    async (seq: number) => {
+      await client.markReceived(conversationId, seq);
+    },
+    [client, conversationId]
+  );
+
   return {
     messages,
     isLoading,
@@ -171,5 +221,7 @@ export function useMessages(client: MVChat2Client, conversationId: string): UseM
     deleteForEveryone,
     deleteForMe,
     react,
+    markRead,
+    markReceived,
   };
 }

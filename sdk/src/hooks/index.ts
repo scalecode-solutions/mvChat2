@@ -4,3 +4,5 @@ export { useMessages, UseMessagesResult } from './useMessages';
 export { useConversations, UseConversationsResult } from './useConversations';
 export { useContacts, UseContactsResult } from './useContacts';
 export { useTyping, UseTypingResult } from './useTyping';
+export { useInvites, UseInvitesResult } from './useInvites';
+export { usePresence, UsePresenceResult, UserPresence } from './usePresence';

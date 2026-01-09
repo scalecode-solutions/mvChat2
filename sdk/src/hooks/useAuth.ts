@@ -7,6 +7,7 @@ export interface UseAuthResult {
   user: User | null;
   userID: string | null;
   mustChangePassword: boolean;
+  emailVerified: boolean;
   isLoading: boolean;
   error: Error | null;
   login: (credentials: LoginCredentials) => Promise<AuthResult>;
@@ -14,6 +15,9 @@ export interface UseAuthResult {
   signup: (data: SignupData) => Promise<AuthResult>;
   logout: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  updateProfile: (profile: any) => Promise<void>;
+  updatePrivateData: (data: any) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
 }
 
 export function useAuth(client: MVChat2Client): UseAuthResult {
@@ -79,11 +83,51 @@ export function useAuth(client: MVChat2Client): UseAuthResult {
     }
   }, [client]);
 
+  const updateProfile = useCallback(async (profile: any) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await client.updateProfile(profile);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client]);
+
+  const updatePrivateData = useCallback(async (data: any) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await client.updatePrivateData(data);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client]);
+
+  const updateEmail = useCallback(async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await client.updateEmail(email);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client]);
+
   return {
     isAuthenticated: client.isAuthenticated,
     user: client.user,
     userID: client.userID,
     mustChangePassword: client.mustChangePassword,
+    emailVerified: client.emailVerified,
     isLoading,
     error,
     login,
@@ -91,5 +135,8 @@ export function useAuth(client: MVChat2Client): UseAuthResult {
     signup,
     logout,
     changePassword,
+    updateProfile,
+    updatePrivateData,
+    updateEmail,
   };
 }
