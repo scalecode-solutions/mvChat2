@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/scalecode-solutions/mvchat2/config"
@@ -56,7 +57,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	remoteAddr := r.RemoteAddr
 	if s.config.Server.UseXForwardedFor {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			remoteAddr = xff
+			// X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+			// Use only the first (original client) IP to prevent spoofing
+			if idx := strings.Index(xff, ","); idx != -1 {
+				remoteAddr = strings.TrimSpace(xff[:idx])
+			} else {
+				remoteAddr = strings.TrimSpace(xff)
+			}
 		}
 	}
 
