@@ -187,10 +187,6 @@ export class MVChat2Client {
           lastSeen: msg.pres.lastSeen,
         });
       }
-
-      if (msg.meta) {
-        this.emit('meta', msg.meta);
-      }
     } catch (err) {
       this.emit('error', err);
     }
@@ -337,6 +333,7 @@ export class MVChat2Client {
       expires: ctrl.params?.expires,
       mustChangePassword: ctrl.params?.mustChangePassword,
       emailVerified: ctrl.params?.emailVerified,
+      desc: ctrl.params?.desc,
     };
   }
 
@@ -359,6 +356,7 @@ export class MVChat2Client {
       expires: ctrl.params?.expires,
       mustChangePassword: ctrl.params?.mustChangePassword,
       emailVerified: ctrl.params?.emailVerified,
+      desc: ctrl.params?.desc,
     };
   }
 
@@ -389,6 +387,7 @@ export class MVChat2Client {
       inviters: ctrl.params?.inviters,
       mustChangePassword: ctrl.params?.mustChangePassword,
       emailVerified: ctrl.params?.emailVerified,
+      desc: ctrl.params?.desc,
     };
   }
 

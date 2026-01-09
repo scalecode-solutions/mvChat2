@@ -48,6 +48,9 @@ export interface AuthResult {
   inviters?: string[];
   mustChangePassword?: boolean;
   emailVerified?: boolean;
+  desc?: {
+    public?: UserPublic;
+  };
 }
 
 export interface ChangePasswordData {
@@ -360,7 +363,6 @@ export interface ServerMessage {
   data?: MsgServerData;
   info?: MsgServerInfo;
   pres?: MsgServerPres;
-  meta?: MsgServerMeta;
 }
 
 export interface MsgServerPres {
@@ -393,12 +395,6 @@ export interface MsgServerInfo {
   content?: any;
   emoji?: string;
   ts?: string;
-}
-
-export interface MsgServerMeta {
-  conv?: string;
-  what?: string;
-  data?: any;
 }
 
 // Error types
