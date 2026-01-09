@@ -300,6 +300,7 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s SessionInterface, ms
 
 	messages, err := h.db.GetMessages(ctx, convID, s.UserID(), get.Before, get.Limit, member.ClearSeq)
 	if err != nil {
+		slog.Error("get messages failed", "conv", convID, "error", err)
 		s.Send(CtrlError(msg.ID, CodeInternalError, "failed to get messages"))
 		return
 	}
