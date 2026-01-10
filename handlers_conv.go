@@ -1175,7 +1175,12 @@ func (h *Handlers) handleUnsend(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"seq":  unsend.Seq,
+		"ts":   now,
+	}))
 
 	// Broadcast unsend to members
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
@@ -1183,7 +1188,7 @@ func (h *Handlers) handleUnsend(s SessionInterface, msg *ClientMessage) {
 		From:           s.UserID().String(),
 		What:           "unsend",
 		Seq:            unsend.Seq,
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 
@@ -1234,7 +1239,12 @@ func (h *Handlers) handleDelete(s SessionInterface, msg *ClientMessage) {
 			return
 		}
 
-		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+		now := time.Now().UTC()
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv": convID.String(),
+			"seq":  del.Seq,
+			"ts":   now,
+		}))
 
 		// Broadcast to members
 		h.broadcastToConv(ctx, convID, &MsgServerInfo{
@@ -1242,7 +1252,7 @@ func (h *Handlers) handleDelete(s SessionInterface, msg *ClientMessage) {
 			From:           s.UserID().String(),
 			What:           "delete",
 			Seq:            del.Seq,
-			Ts:             time.Now().UTC(),
+			Ts:             now,
 		}, s.ID())
 	} else {
 		// Delete for me only
@@ -1250,7 +1260,11 @@ func (h *Handlers) handleDelete(s SessionInterface, msg *ClientMessage) {
 			s.Send(CtrlError(msg.ID, CodeInternalError, "failed to delete"))
 			return
 		}
-		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv": convID.String(),
+			"seq":  del.Seq,
+			"ts":   time.Now().UTC(),
+		}))
 	}
 }
 
@@ -1287,7 +1301,13 @@ func (h *Handlers) handleReact(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv":  convID.String(),
+		"seq":   react.Seq,
+		"emoji": react.Emoji,
+		"ts":    now,
+	}))
 
 	// Broadcast to members
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
@@ -1296,7 +1316,7 @@ func (h *Handlers) handleReact(s SessionInterface, msg *ClientMessage) {
 		What:           "react",
 		Seq:            react.Seq,
 		Emoji:          react.Emoji,
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 

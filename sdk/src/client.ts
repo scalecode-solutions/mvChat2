@@ -23,6 +23,62 @@ import {
   CreateRoomResult,
 } from './types';
 
+// Base64 utilities that work in both browser and React Native
+const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function base64Encode(str: string): string {
+  if (typeof btoa === 'function') {
+    return btoa(str);
+  }
+  // Manual encode for React Native
+  let output = '';
+  let i = 0;
+  while (i < str.length) {
+    const chr1 = str.charCodeAt(i++);
+    const chr2 = str.charCodeAt(i++);
+    const chr3 = str.charCodeAt(i++);
+    const enc1 = chr1 >> 2;
+    const enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
+    let enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
+    let enc4 = chr3 & 63;
+    if (isNaN(chr2)) {
+      enc3 = enc4 = 64;
+    } else if (isNaN(chr3)) {
+      enc4 = 64;
+    }
+    output += base64Chars.charAt(enc1) + base64Chars.charAt(enc2) + base64Chars.charAt(enc3) + base64Chars.charAt(enc4);
+  }
+  return output;
+}
+
+function base64Decode(str: string): string {
+  if (typeof atob === 'function') {
+    return atob(str);
+  }
+  // Manual decode for React Native
+  let output = '';
+  let i = 0;
+  const input = str.replace(/[^A-Za-z0-9+/=]/g, '');
+  while (i < input.length) {
+    const enc1 = base64Chars.indexOf(input.charAt(i++));
+    const enc2 = base64Chars.indexOf(input.charAt(i++));
+    const enc3 = base64Chars.indexOf(input.charAt(i++));
+    const enc4 = base64Chars.indexOf(input.charAt(i++));
+    const chr1 = (enc1 << 2) | (enc2 >> 4);
+    const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+    const chr3 = ((enc3 & 3) << 6) | enc4;
+    output += String.fromCharCode(chr1);
+    if (enc3 !== 64) output += String.fromCharCode(chr2);
+    if (enc4 !== 64) output += String.fromCharCode(chr3);
+  }
+  // Handle UTF-8
+  try {
+    return decodeURIComponent(escape(output));
+  } catch {
+    return output;
+  }
+}
+
 type EventCallback = (...args: any[]) => void;
 
 export class MVChat2Client {
@@ -165,6 +221,12 @@ export class MVChat2Client {
 
   private handleMessage(data: string): void {
     try {
+      // Handle both string and Blob data (React Native WebSocket can send Blob)
+      if (typeof data !== 'string') {
+        console.warn('[SDK] Received non-string data:', typeof data);
+        return;
+      }
+
       const msg: ServerMessage = JSON.parse(data);
 
       if (msg.ctrl) {
@@ -177,7 +239,7 @@ export class MVChat2Client {
           seq: msg.data.seq,
           from: msg.data.from,
           ts: msg.data.ts,
-          content: msg.data.content,
+          content: this.decodeContent(msg.data.content),
           head: msg.data.head,
         });
       }
@@ -194,6 +256,7 @@ export class MVChat2Client {
         });
       }
     } catch (err) {
+      console.error('[SDK] Error parsing message:', err, 'data:', data?.substring?.(0, 200));
       this.emit('error', err);
     }
   }
@@ -212,6 +275,11 @@ export class MVChat2Client {
         }
       }
     }
+  }
+
+  // Get number of pending requests (for debugging)
+  get pendingRequestCount(): number {
+    return this.pendingRequests.size;
   }
 
   private handleInfo(info: any): void {
@@ -307,22 +375,36 @@ export class MVChat2Client {
   // Request/response
   private async request(msg: ClientMessage): Promise<MsgServerCtrl> {
     return new Promise((resolve, reject) => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        reject(new MVChat2Error(0, 'Not connected'));
+      if (!this.ws) {
+        reject(new MVChat2Error(0, 'Not connected: WebSocket is null'));
+        return;
+      }
+      if (this.ws.readyState !== WebSocket.OPEN) {
+        reject(new MVChat2Error(0, `Not connected: WebSocket state is ${this.ws.readyState}`));
         return;
       }
 
       const id = String(++this.messageId);
       msg.id = id;
 
+      const msgType = Object.keys(msg).filter(k => k !== 'id')[0];
+
       const timeout = setTimeout(() => {
+        console.warn(`[SDK] Request timeout: id=${id} type=${msgType} pending=${this.pendingRequests.size}`);
         this.pendingRequests.delete(id);
         reject(new MVChat2Error(0, 'Request timeout'));
       }, this.config.timeout);
 
       this.pendingRequests.set(id, { resolve, reject, timeout });
 
-      this.ws.send(JSON.stringify(msg));
+      try {
+        this.ws.send(JSON.stringify(msg));
+      } catch (err) {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(id);
+        console.error('[SDK] Failed to send message:', err);
+        reject(new MVChat2Error(0, 'Failed to send message'));
+      }
     });
   }
 
@@ -344,7 +426,7 @@ export class MVChat2Client {
 
   // Authentication
   async login(credentials: LoginCredentials): Promise<AuthResult> {
-    const secret = btoa(`${credentials.username}:${credentials.password}`);
+    const secret = base64Encode(`${credentials.username}:${credentials.password}`);
     const ctrl = await this.request({
       login: {
         scheme: 'basic',
@@ -391,7 +473,7 @@ export class MVChat2Client {
   }
 
   async signup(data: SignupData): Promise<AuthResult> {
-    const secret = btoa(`${data.username}:${data.password}`);
+    const secret = base64Encode(`${data.username}:${data.password}`);
     const ctrl = await this.request({
       acc: {
         user: 'new',
@@ -422,7 +504,7 @@ export class MVChat2Client {
   }
 
   async changePassword(data: ChangePasswordData): Promise<void> {
-    const secret = btoa(`${data.oldPassword}:${data.newPassword}`);
+    const secret = base64Encode(`${data.oldPassword}:${data.newPassword}`);
     await this.request({
       acc: {
         user: 'me',
@@ -556,6 +638,21 @@ export class MVChat2Client {
     return ctrl.params?.receipts || [];
   }
 
+  // Helper to decode base64 content
+  private decodeContent(content: any): any {
+    if (typeof content === 'string') {
+      try {
+        const decoded = base64Decode(content);
+        return JSON.parse(decoded);
+      } catch (e) {
+        // If decoding fails, return as-is
+        console.warn('[SDK] Failed to decode content:', e);
+        return content;
+      }
+    }
+    return content;
+  }
+
   // Messages
   async getMessages(convId: string, options?: { limit?: number; before?: number }): Promise<Message[]> {
     const ctrl = await this.request({
@@ -566,7 +663,12 @@ export class MVChat2Client {
         before: options?.before,
       },
     });
-    return ctrl.params?.messages || [];
+    const messages = ctrl.params?.messages || [];
+    // Decode base64-encoded content
+    return messages.map((msg: any) => ({
+      ...msg,
+      content: this.decodeContent(msg.content),
+    }));
   }
 
   async sendMessage(convId: string, options: SendMessageOptions): Promise<{ seq: number }> {

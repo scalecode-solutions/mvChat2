@@ -132,6 +132,8 @@ export interface Message {
   deleted?: boolean;
   // View-once message indicator
   viewOnce?: boolean;
+  // Reactions - map of emoji to array of user IDs who reacted
+  reactions?: Record<string, string[]>;
 }
 
 export interface Irido {
