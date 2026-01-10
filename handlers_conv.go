@@ -591,12 +591,12 @@ func (h *Handlers) handleGetMentions(ctx context.Context, s SessionInterface, ms
 		if m.DeletedAt != nil {
 			item["deleted"] = true
 		} else {
-			// Decrypt content and return as raw JSON (not base64-encoded []byte)
+			// Decrypt content
 			plaintext, err := h.encryptor.Decrypt(m.Content)
 			if err == nil {
-				item["content"] = json.RawMessage(plaintext)
+				item["content"] = plaintext
 			} else {
-				item["content"] = json.RawMessage(m.Content)
+				item["content"] = m.Content
 			}
 		}
 		if m.Head != nil {
@@ -795,12 +795,12 @@ func (h *Handlers) handleGetMessages(ctx context.Context, s SessionInterface, ms
 		if m.DeletedAt != nil {
 			item["deleted"] = true
 		} else {
-			// Decrypt content and return as raw JSON (not base64-encoded []byte)
+			// Decrypt content
 			plaintext, err := h.encryptor.Decrypt(m.Content)
 			if err == nil {
-				item["content"] = json.RawMessage(plaintext)
+				item["content"] = plaintext
 			} else {
-				item["content"] = json.RawMessage(m.Content) // Fallback for unencrypted messages
+				item["content"] = m.Content // Fallback for unencrypted messages
 			}
 		}
 		if m.Head != nil {
