@@ -87,7 +87,9 @@ func (h *Handlers) handleRemoveContact(ctx context.Context, s SessionInterface, 
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"user": contactID.String(),
+	}))
 }
 
 func (h *Handlers) handleUpdateContactNickname(ctx context.Context, s SessionInterface, msg *ClientMessage, userIDStr string, nickname *string) {
@@ -103,5 +105,11 @@ func (h *Handlers) handleUpdateContactNickname(ctx context.Context, s SessionInt
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	response := map[string]any{
+		"user": contactID.String(),
+	}
+	if nickname != nil {
+		response["nickname"] = *nickname
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeOK, response))
 }

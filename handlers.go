@@ -508,7 +508,21 @@ func (h *Handlers) handleUpdateAccount(ctx context.Context, s SessionInterface, 
 		}
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	// Build response with what was updated
+	response := map[string]any{}
+	if acc.Desc != nil && acc.Desc.Public != nil {
+		response["public"] = acc.Desc.Public
+	}
+	if acc.Secret != "" {
+		response["passwordChanged"] = true
+	}
+	if acc.Email != nil {
+		response["email"] = *acc.Email
+	}
+	if acc.Lang != nil {
+		response["lang"] = *acc.Lang
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeOK, response))
 }
 
 // HandleSearch processes user search requests.

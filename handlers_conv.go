@@ -142,7 +142,9 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 
 	// Check if any updates provided
 	if settings.Favorite == nil && settings.Muted == nil && settings.Blocked == nil && settings.Private == nil {
-		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv": convID.String(),
+		}))
 		return
 	}
 
@@ -151,7 +153,23 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	// Return the updated settings
+	response := map[string]any{
+		"conv": convID.String(),
+	}
+	if settings.Favorite != nil {
+		response["favorite"] = *settings.Favorite
+	}
+	if settings.Muted != nil {
+		response["muted"] = *settings.Muted
+	}
+	if settings.Blocked != nil {
+		response["blocked"] = *settings.Blocked
+	}
+	if settings.Private != nil {
+		response["private"] = settings.Private
+	}
+	s.Send(CtrlSuccess(msg.ID, CodeOK, response))
 }
 
 // HandleRoom processes room requests.
@@ -291,14 +309,18 @@ func (h *Handlers) handleLeaveRoom(ctx context.Context, s SessionInterface, msg 
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"ts":   now,
+	}))
 
 	// Broadcast to remaining members
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
 		ConversationID: convID.String(),
 		From:           s.UserID().String(),
 		What:           "member_left",
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 
@@ -354,14 +376,19 @@ func (h *Handlers) handleKickFromRoom(ctx context.Context, s SessionInterface, m
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"user": targetUserID.String(),
+		"ts":   now,
+	}))
 
 	// Broadcast to all members (including kicked user so their client knows)
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
 		ConversationID: convID.String(),
 		From:           s.UserID().String(),
 		What:           "member_kicked",
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, "")
 }
 
@@ -1402,7 +1429,12 @@ func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 		}
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"seq":  read.Seq,
+		"ts":   now,
+	}))
 
 	// Broadcast to members
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
@@ -1410,7 +1442,7 @@ func (h *Handlers) handleRead(s SessionInterface, msg *ClientMessage) {
 		From:           s.UserID().String(),
 		What:           "read",
 		Seq:            read.Seq,
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 
@@ -1444,7 +1476,12 @@ func (h *Handlers) handleRecv(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	now := time.Now().UTC()
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"seq":  recv.Seq,
+		"ts":   now,
+	}))
 
 	// Broadcast to members
 	h.broadcastToConv(ctx, convID, &MsgServerInfo{
@@ -1452,7 +1489,7 @@ func (h *Handlers) handleRecv(s SessionInterface, msg *ClientMessage) {
 		From:           s.UserID().String(),
 		What:           "recv",
 		Seq:            recv.Seq,
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 
@@ -1497,7 +1534,11 @@ func (h *Handlers) handleClear(s SessionInterface, msg *ClientMessage) {
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv": convID.String(),
+		"seq":  clear.Seq,
+		"ts":   time.Now().UTC(),
+	}))
 }
 
 // HandlePin processes pin/unpin message requests.
@@ -1561,7 +1602,10 @@ func (h *Handlers) handlePin(s SessionInterface, msg *ClientMessage) {
 			return
 		}
 
-		s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv":       convID.String(),
+			"unpinnedAt": now,
+		}))
 
 		// Broadcast unpin
 		h.broadcastToConv(ctx, convID, &MsgServerInfo{
