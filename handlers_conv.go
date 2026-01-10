@@ -118,7 +118,9 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 			return
 		}
 
+		now := time.Now().UTC()
 		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv":            convID.String(),
 			"disappearingTTL": ttlValue,
 		}))
 
@@ -127,7 +129,7 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 			ConversationID: convID.String(),
 			From:           s.UserID().String(),
 			What:           "disappearing_updated",
-			Ts:             time.Now().UTC(),
+			Ts:             now,
 		}, "")
 		return
 	}
@@ -268,9 +270,12 @@ func (h *Handlers) handleInviteToRoom(ctx context.Context, s SessionInterface, m
 		return
 	}
 
+	now := time.Now().UTC()
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv":   convID.String(),
 		"user":   targetUserID.String(),
 		"public": targetUser.Public,
+		"ts":     now,
 	}))
 
 	// Broadcast to members
@@ -278,7 +283,7 @@ func (h *Handlers) handleInviteToRoom(ctx context.Context, s SessionInterface, m
 		ConversationID: convID.String(),
 		From:           s.UserID().String(),
 		What:           "member_joined",
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, "")
 }
 
@@ -432,7 +437,9 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 			return
 		}
 
+		now := time.Now().UTC()
 		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv":            convID.String(),
 			"disappearingTTL": ttlValue,
 		}))
 
@@ -441,7 +448,7 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 			ConversationID: convID.String(),
 			From:           s.UserID().String(),
 			What:           "disappearing_updated",
-			Ts:             time.Now().UTC(),
+			Ts:             now,
 		}, "")
 		return
 	}
@@ -453,7 +460,9 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 			return
 		}
 
+		now := time.Now().UTC()
 		s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+			"conv":          convID.String(),
 			"noScreenshots": *room.NoScreenshots,
 		}))
 
@@ -462,7 +471,7 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 			ConversationID: convID.String(),
 			From:           s.UserID().String(),
 			What:           "room_updated",
-			Ts:             time.Now().UTC(),
+			Ts:             now,
 		}, "")
 		return
 	}

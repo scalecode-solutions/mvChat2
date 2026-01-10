@@ -175,7 +175,9 @@ func (h *Handlers) handleRevokeInvite(ctx context.Context, s *Session, msg *Clie
 		return
 	}
 
-	s.Send(CtrlSuccess(msg.ID, CodeOK, nil))
+	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"id": inviteID.String(),
+	}))
 }
 
 // handleRedeemInviteExisting allows an existing logged-in user to redeem an invite code.
