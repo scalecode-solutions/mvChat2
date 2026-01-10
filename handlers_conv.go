@@ -487,7 +487,9 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 		return
 	}
 
+	now := time.Now().UTC()
 	s.Send(CtrlSuccess(msg.ID, CodeOK, map[string]any{
+		"conv":   convID.String(),
 		"public": public,
 	}))
 
@@ -497,7 +499,7 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 		From:           s.UserID().String(),
 		What:           "room_updated",
 		Content:        public,
-		Ts:             time.Now().UTC(),
+		Ts:             now,
 	}, s.ID())
 }
 
