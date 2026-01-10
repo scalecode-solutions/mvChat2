@@ -129,6 +129,7 @@ func (h *Handlers) handleManageDM(ctx context.Context, s SessionInterface, msg *
 			ConversationID: convID.String(),
 			From:           s.UserID().String(),
 			What:           "disappearing_updated",
+			TTL:            ttlValue,
 			Ts:             now,
 		}, "")
 		return
@@ -283,6 +284,7 @@ func (h *Handlers) handleInviteToRoom(ctx context.Context, s SessionInterface, m
 		ConversationID: convID.String(),
 		From:           s.UserID().String(),
 		What:           "member_joined",
+		User:           targetUserID.String(),
 		Ts:             now,
 	}, "")
 }
@@ -393,6 +395,7 @@ func (h *Handlers) handleKickFromRoom(ctx context.Context, s SessionInterface, m
 		ConversationID: convID.String(),
 		From:           s.UserID().String(),
 		What:           "member_kicked",
+		User:           targetUserID.String(),
 		Ts:             now,
 	}, "")
 }
@@ -448,6 +451,7 @@ func (h *Handlers) handleUpdateRoom(ctx context.Context, s SessionInterface, msg
 			ConversationID: convID.String(),
 			From:           s.UserID().String(),
 			What:           "disappearing_updated",
+			TTL:            ttlValue,
 			Ts:             now,
 		}, "")
 		return

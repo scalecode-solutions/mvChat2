@@ -222,14 +222,16 @@ type MsgServerData struct {
 	Ts             time.Time       `json:"ts"`
 }
 
-// MsgServerInfo is a notification (typing, read, edit, unsend, react).
+// MsgServerInfo is a notification (typing, read, edit, unsend, react, member events, etc).
 type MsgServerInfo struct {
 	ConversationID string          `json:"conv"`
 	From           string          `json:"from"`
-	What           string          `json:"what"` // "typing", "read", "edit", "unsend", "react"
+	What           string          `json:"what"` // "typing", "read", "edit", "unsend", "react", "member_joined", "member_left", "member_kicked", etc.
 	Seq            int             `json:"seq,omitempty"`
-	Content        json.RawMessage `json:"content,omitempty"` // For edit
+	Content        json.RawMessage `json:"content,omitempty"` // For edit, room_updated
 	Emoji          string          `json:"emoji,omitempty"`   // For react
+	User           string          `json:"user,omitempty"`    // For member_joined, member_kicked (the affected user)
+	TTL            *int            `json:"ttl,omitempty"`     // For disappearing_updated
 	Ts             time.Time       `json:"ts"`
 }
 

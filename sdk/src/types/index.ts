@@ -285,22 +285,25 @@ export interface UnpinEvent {
 export interface DisappearingUpdatedEvent {
   conv: string;
   from: string;
+  ttl?: number;  // The new TTL value (undefined = disabled)
 }
 
 // Room management events
 export interface MemberJoinedEvent {
   conv: string;
-  from: string;
+  from: string;   // Who invited them
+  user: string;   // Who joined
 }
 
 export interface MemberLeftEvent {
   conv: string;
-  from: string;
+  from: string;   // Who left (same as the user who initiated)
 }
 
 export interface MemberKickedEvent {
   conv: string;
-  from: string;
+  from: string;   // Who kicked them
+  user: string;   // Who was kicked
 }
 
 export interface RoomUpdatedEvent {
@@ -540,6 +543,8 @@ export interface MsgServerInfo {
   seq?: number;
   content?: any;
   emoji?: string;
+  user?: string;  // For member_joined, member_kicked (the affected user)
+  ttl?: number;   // For disappearing_updated
   ts?: string;
 }
 

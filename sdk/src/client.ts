@@ -312,16 +312,16 @@ export class MVChat2Client {
         this.emit('unpin', { conv: info.conv, from: info.from });
         break;
       case 'disappearing_updated':
-        this.emit('disappearingUpdated', { conv: info.conv, from: info.from });
+        this.emit('disappearingUpdated', { conv: info.conv, from: info.from, ttl: info.ttl });
         break;
       case 'member_joined':
-        this.emit('memberJoined', { conv: info.conv, from: info.from });
+        this.emit('memberJoined', { conv: info.conv, from: info.from, user: info.user });
         break;
       case 'member_left':
         this.emit('memberLeft', { conv: info.conv, from: info.from });
         break;
       case 'member_kicked':
-        this.emit('memberKicked', { conv: info.conv, from: info.from });
+        this.emit('memberKicked', { conv: info.conv, from: info.from, user: info.user });
         break;
       case 'room_updated':
         this.emit('roomUpdated', { conv: info.conv, from: info.from, content: info.content });
